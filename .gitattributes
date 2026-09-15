@@ -1,0 +1,21 @@
+* text=auto
+
+.gitattributes text eol=lf
+.gitignore text eol=lf
+*.cjs text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.jsonl text eol=lf
+*.md text eol=lf
+*.svg text eol=lf
+*.txt text eol=lf
+*.webmanifest text eol=lf
+*.yml text eol=lf
+_headers text eol=lf
+VERSION text eol=lf
+RELEASE_CHANNEL text eol=lf
+
+*.ps1 text eol=crlf
+*.wasm binary

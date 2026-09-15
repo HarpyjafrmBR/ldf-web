@@ -1,0 +1,19 @@
+{
+  "name": "LDF Web - Lacre Digital Forense",
+  "short_name": "LDF Web",
+  "description": "Cadeia de custódia digital com processamento criptográfico local.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#DAC7A1",
+  "theme_color": "#DAC7A1",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

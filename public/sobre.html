@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#DAC7A1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; worker-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="description" content="Conheça a finalidade, o funcionamento, as garantias e os limites do LDF Web — Lacre Digital Forense.">
+  <title>Sobre o LDF Web — Lacre Digital Forense</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <script src="theme.js?v=beta-1.0.0"></script>
+  <link rel="stylesheet" href="styles.css?v=beta-1.0.0">
+</head>
+<body class="about-page page-transition">
+  <header class="app-header about-header">
+    <a class="brand about-brand" href="index.html" data-page-transition aria-label="Voltar ao LDF Web">
+      <span class="brand-mark" aria-hidden="true">LDF</span>
+      <span class="brand-copy">
+        <strong>LDF Web</strong>
+        <span>Lacre Digital Forense</span>
+      </span>
+    </a>
+    <div class="header-actions">
+      <a class="about-back-link" href="index.html" data-page-transition>
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
+        <span>Voltar à ferramenta</span>
+      </a>
+      <button id="theme-toggle" class="icon-button theme-toggle" type="button" title="Usar tema escuro" aria-label="Usar tema escuro">
+        <svg data-theme-icon="dark" aria-hidden="true" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/></svg>
+        <svg data-theme-icon="light" aria-hidden="true" viewBox="0 0 24 24" hidden><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="about-main">
+    <article class="about-document">
+      <header class="about-hero">
+        <p class="about-kicker">Apresentação da ferramenta</p>
+        <h1>LDF Web <span>— Lacre Digital Forense</span></h1>
+        <p class="about-lead">
+          O LDF Web é uma ferramenta gratuita, local-first e com código-fonte disponível
+          para inspeção, destinada a acondicionar, documentar e proteger vestígios digitais.
+        </p>
+        <p>
+          Ele reúne arquivos, contexto da coleta, documentos e hashes em um único
+          contêiner criptografado. O processamento ocorre no dispositivo do operador,
+          sem upload dos vestígios.
+        </p>
+        <p>
+          Seu objetivo é padronizar a preparação de vestígios digitais para transferência,
+          mantendo o conteúdo protegido e permitindo a verificação da integridade, em
+          apoio à documentação da cadeia de custódia.
+        </p>
+      </header>
+
+      <section id="como-funciona" class="about-section" aria-labelledby="como-funciona-title">
+        <div class="about-section-heading">
+          <span>01</span>
+          <div>
+            <p>Fluxo operacional</p>
+            <h2 id="como-funciona-title">Como funciona</h2>
+          </div>
+        </div>
+        <p>O procedimento é realizado em etapas simples:</p>
+        <ol class="about-steps">
+          <li><span>1</span><div><strong>Incluir</strong><p>Selecione os arquivos que serão acondicionados.</p></div></li>
+          <li><span>2</span><div><strong>Qualificar</strong><p>Registre a origem, a forma de obtenção e os responsáveis.</p></div></li>
+          <li><span>3</span><div><strong>Fixar a integridade</strong><p>Calcule o hash SHA-256 de cada vestígio.</p></div></li>
+          <li><span>4</span><div><strong>Declarar</strong><p>Revise e assine a Declaração de Registro.</p></div></li>
+          <li><span>5</span><div><strong>Lacrar</strong><p>Reúna o conjunto em um contêiner criptografado.</p></div></li>
+          <li><span>6</span><div><strong>Encaminhar</strong><p>Encaminhe o contêiner e compartilhe a chave por canal separado.</p></div></li>
+          <li><span>7</span><div><strong>Receber e conferir</strong><p>Abra o contêiner e recalcule automaticamente os hashes.</p></div></li>
+        </ol>
+        <p class="about-conclusion">
+          O fluxo vincula cada vestígio ao respectivo hash, à qualificação, aos anexos
+          e à Declaração de Registro assinada. No recebimento, os hashes são recalculados
+          para verificar se o conteúdo corresponde, byte por byte, ao que foi acondicionado.
+        </p>
+      </section>
+
+      <section id="privacidade-seguranca" class="about-section" aria-labelledby="privacidade-seguranca-title">
+        <div class="about-section-heading">
+          <span>02</span>
+          <div>
+            <p>Processamento local</p>
+            <h2 id="privacidade-seguranca-title">Privacidade e segurança</h2>
+          </div>
+        </div>
+        <div class="about-callout">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg>
+          <p><strong>O processamento é realizado localmente, no próprio dispositivo.</strong></p>
+        </div>
+        <p>
+          Nenhum conteúdo — vestígios, chave, nome ou dados da operação — é enviado
+          nem armazenado externamente. O site fornece os arquivos que compõem a
+          ferramenta, executados no próprio aparelho por meio do navegador, sem exigir
+          instalação.
+        </p>
+        <p>
+          A página deve ser iniciada online. Depois de carregada e preparada, as
+          funções essenciais ficam disponíveis mesmo sem conexão com a internet.
+        </p>
+        <p>
+          Os contêineres LDF utilizam criptografia autenticada AES-256-GCM, destinada a
+          proteger a confidencialidade. E cada vestígio recebe um hash SHA-256 para
+          conferência de integridade.
+        </p>
+        <p>
+          O acesso ao conteúdo é liberado por uma chave de segurança, que permanece sob
+          responsabilidade das partes envolvidas. O LDF Web não recebe, armazena ou
+          recupera essa chave.
+        </p>
+      </section>
+
+      <section id="codigo-aberto" class="about-section" aria-labelledby="codigo-aberto-title">
+        <div class="about-section-heading">
+          <span>03</span>
+          <div>
+            <p>Transparência</p>
+            <h2 id="codigo-aberto-title">Código disponível e uso gratuito</h2>
+          </div>
+        </div>
+        <p>
+          O LDF Web pode ser usado gratuitamente em sua release oficial inalterada. Seu
+          código-fonte fica disponível para inspeção técnica, auditoria e preparação de
+          contribuições nos termos da Licença do Projeto LDF Web 1.0.
+        </p>
+        <p class="about-source-status" data-source-state="published">
+          Repositório oficial: <a href="https://github.com/HarpyjafrmBR/ldf-web" target="_blank" rel="noopener noreferrer">ldf-web (GitHub)</a>.
+        </p>
+      </section>
+
+      <section id="responsabilidade-operador" class="about-section" aria-labelledby="responsabilidade-operador-title">
+        <div class="about-section-heading">
+          <span>04</span>
+          <div>
+            <p>Revisão humana</p>
+            <h2 id="responsabilidade-operador-title">Responsabilidade do operador</h2>
+          </div>
+        </div>
+        <p>
+          O LDF Web auxilia na organização, documentação, proteção e conferência dos
+          arquivos digitais, mas a responsabilidade pelo procedimento permanece com o
+          operador.
+        </p>
+        <p>
+          Cabe ao responsável selecionar corretamente os vestígios, informar sua
+          origem, revisar os registros, preservar os originais quando disponíveis,
+          proteger a chave e conferir as verificações realizadas.
+        </p>
+        <aside class="about-validation-note" aria-label="Validação das declarações">
+          <p>
+            <strong>A conferência do operador é insubstituível.</strong> As declarações
+            produzidas pelo sistema devem ser revisadas e assinadas. A validade da
+            assinatura eletrônica deve ser conferida por serviço confiável, como o
+            <a href="https://validar.iti.gov.br/" target="_blank" rel="noopener noreferrer">VALIDAR do Governo Federal</a>.
+          </p>
+        </aside>
+        <p>
+          A ferramenta organiza e estrutura os elementos que precisam ser conferidos e
+          indica a validação no serviço oficial. A decisão de prosseguir e a
+          responsabilidade pelas informações permanecem com quem realiza o procedimento.
+        </p>
+      </section>
+
+      <section id="alcance-limites" class="about-section" aria-labelledby="alcance-limites-title">
+        <div class="about-section-heading">
+          <span>05</span>
+          <div>
+            <p>Uso responsável</p>
+            <h2 id="alcance-limites-title">Alcance e limites</h2>
+          </div>
+        </div>
+        <p>
+          O LDF Web apoia as etapas de fixação, acondicionamento, preparação para
+          transporte e recebimento de vestígios digitais.
+        </p>
+        <p>
+          Ele não realiza investigação, aquisição forense ou análise do conteúdo e não
+          substitui a preservação dos originais, os procedimentos de guarda aplicáveis ou
+          a cadeia de custódia como um todo.
+        </p>
+        <p>
+          A coincidência dos hashes demonstra que os arquivos comparados possuem o
+          mesmo conteúdo binário. A avaliação sobre origem, autenticidade, contexto e
+          relevância depende dos demais registros e do procedimento adotado.
+        </p>
+        <blockquote>
+          O LDF Web funciona como um elo técnico entre a coleta e o recebimento,
+          reunindo vestígios, documentação, integridade e proteção criptográfica em um
+          fluxo simples, padronizado e verificável.
+        </blockquote>
+      </section>
+
+      <details class="about-faq">
+        <summary>Principais perguntas e respostas</summary>
+        <div class="about-faq-list">
+          <details class="about-faq-item">
+            <summary>Como conferir se estou usando o LDF Web oficial?</summary>
+            <p>Confira o endereço oficial, o HTTPS, a versão no rodapé e o <a href="https://github.com/HarpyjafrmBR/ldf-web" target="_blank" rel="noopener noreferrer">repositório público no GitHub</a>. Compare também os hashes publicados.</p>
+          </details>
+          <details class="about-faq-item">
+            <summary>Consigo fechar ou abrir um lote sem internet? E com o site indisponível?</summary>
+            <p>Sim, desde que o LDF Web tenha sido inicializado anteriormente no mesmo dispositivo, navegador e perfil.</p>
+          </details>
+          <details class="about-faq-item">
+            <summary>Posso instalar o LDF Web no computador?</summary>
+            <p>Sim. Chrome e Edge permitem instalá-lo como aplicativo web, sem instalador tradicional. A instalação também facilita o uso offline.</p>
+          </details>
+          <details class="about-faq-item">
+            <summary>Perdi a chave de acesso. O sistema consegue recuperá-la?</summary>
+            <p>Não. A chave nunca é enviada ou armazenada pelo LDF Web. Sem ela, o lote protegido não poderá ser aberto.</p>
+          </details>
+          <details class="about-faq-item">
+            <summary>Meus vestígios ou dados da operação são enviados para a internet?</summary>
+            <p>Não. Vestígios, chave e informações do lote são processados localmente. A conexão serve para carregar ou atualizar o aplicativo.</p>
+          </details>
+          <details class="about-faq-item">
+            <summary>O que a conferência do hash comprova?</summary>
+            <p>Hashes iguais indicam conteúdo binário idêntico. Isso ajuda a detectar alterações, mas não comprova sozinho autoria, origem, veracidade ou validade jurídica.</p>
+          </details>
+          <details class="about-faq-item">
+            <summary>O LDF Web assina ou valida a assinatura da declaração?</summary>
+            <p>Não. Ele gera a declaração e inclui o PDF assinado no lote. A assinatura deve ser realizada externamente e conferida em serviço confiável.</p>
+          </details>
+          <details class="about-faq-item">
+            <summary>O que devo preservar depois de criar um lote?</summary>
+            <p>Preserve o contêiner LDF, os originais disponíveis, a declaração e os registros do procedimento. Guarde a chave separadamente e com segurança.</p>
+          </details>
+          <details class="about-faq-item">
+            <summary>Por que os controles ficam bloqueados quando a preparação falha?</summary>
+            <p>Para impedir o início de uma operação sem confirmar que todos os componentes locais estão íntegros.</p>
+          </details>
+          <details class="about-faq-item">
+            <summary>O que acontece se eu fechar ou atualizar a página durante uma operação?</summary>
+            <p>A operação pode ser interrompida e os dados ainda não salvos podem ser descartados. Aguarde a conclusão do fechamento ou da abertura do lote e salve os arquivos gerados antes de fechar, atualizar ou sair da página.</p>
+          </details>
+        </div>
+      </details>
+
+      <footer class="about-document-footer">
+        <a class="button primary" href="index.html" data-page-transition>Voltar à ferramenta</a>
+        <div class="about-project-meta">
+          <p>LDF Web — Lacre Digital Forense · v1.0.0 · Beta</p>
+          <p>Contato: <a href="mailto:administrador_LDFWeb@lacredigitalforense.seg.br">administrador_LDFWeb@lacredigitalforense.seg.br</a></p>
+          <p>Todos os direitos reservados ao Projeto LDF Web.</p>
+        </div>
+      </footer>
+    </article>
+  </main>
+
+</body>
+</html>

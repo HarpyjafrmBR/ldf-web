@@ -1,0 +1,50 @@
+name: validação da distribuição pública
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - name: Obter exatamente o commit solicitado
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Validar alteração e sintaxe
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File .\tools\verify-public-git-change.ps1
+          if ($LASTEXITCODE -ne 0) { throw "Verificação da alteração Git falhou" }
+          Get-ChildItem -LiteralPath . -File -Recurse | Where-Object {
+            $_.Extension -in ".js", ".mjs", ".cjs"
+          } | ForEach-Object {
+            node --check $_.FullName
+            if ($LASTEXITCODE -ne 0) { throw "JavaScript inválido: $($_.FullName)" }
+          }
+          Get-ChildItem -LiteralPath . -Filter *.ps1 -File -Recurse | ForEach-Object {
+            $tokens = $null
+            $errors = $null
+            [void][Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors)
+            if ($errors.Count) { throw "PowerShell inválido: $($_.FullName)" }
+          }
+
+      - name: Validar inventário, privacidade e release
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $manifest = Get-Content -LiteralPath .\PUBLIC_EXPORT_MANIFEST.json -Raw | ConvertFrom-Json
+          & .\tools\verify-public-export.ps1 `
+            -Root . `
+            -ExpectedVersion ([string]$manifest.version) `
+            -ExpectedReleaseChannel ([string]$manifest.releaseChannel) `
+            -ExpectedExportSourceCommit ([string]$manifest.exportSourceCommit) `
+            -ExpectedReleaseSourceCommit ([string]$manifest.releaseSourceCommit)

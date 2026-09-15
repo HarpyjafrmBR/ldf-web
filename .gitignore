@@ -1,0 +1,12 @@
+# Resíduos locais
+.DS_Store
+Thumbs.db
+*.log
+
+# Credenciais e chaves não pertencem à distribuição
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.pfx

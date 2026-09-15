@@ -1,0 +1,42 @@
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'
+  Strict-Transport-Security: max-age=300
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: same-origin
+
+/*.js
+  Content-Type: text/javascript; charset=utf-8
+
+/mediainfo.wasm
+  Content-Type: application/wasm
+  Cache-Control: public, max-age=31536000, immutable
+
+/index.html
+  Cache-Control: no-cache
+
+/sw.js
+  Cache-Control: no-cache
+
+/manifest.webmanifest
+  Content-Type: application/manifest+json; charset=utf-8
+  Cache-Control: no-cache
+
+/release-manifest.json
+  Content-Type: application/json; charset=utf-8
+  Cache-Control: no-cache
+
+/sbom.spdx.json
+  Content-Type: application/json; charset=utf-8
+  Cache-Control: no-cache
+
+/provenance.intoto.jsonl
+  Content-Type: application/json; charset=utf-8
+  Cache-Control: no-cache
+
+/SHA256SUMS.txt
+  Content-Type: text/plain; charset=utf-8
+  Cache-Control: no-cache
