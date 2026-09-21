@@ -2,8 +2,8 @@
  * MediaInfo executa em Worker e carrega somente os artefatos locais fixados na
  * publicação. Nenhum dado do vestígio é enviado para rede ou serviço externo.
  */
-importScripts("mediainfo.min.js?v=beta-1.0.0");
-importScripts("pdf-metadata.js?v=beta-1.0.0");
+importScripts("mediainfo.min.js?v=beta-1.1.2");
+importScripts("pdf-metadata.js?v=beta-1.1.2");
 
 "use strict";
 
@@ -107,7 +107,7 @@ function prepareMediaInfo() {
       format: "object",
       full: true,
       locateFile: fileName => fileName === "MediaInfoModule.wasm"
-        ? new URL("mediainfo.wasm?v=beta-1.0.0", self.location.href).href
+        ? new URL("mediainfo.wasm?v=beta-1.1.2", self.location.href).href
         : new URL(fileName, self.location.href).href
     });
   }

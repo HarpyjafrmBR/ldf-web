@@ -10,7 +10,7 @@
   const LIGHT_THEME_COLOR = "#DAC7A1";
   const DARK_THEME_COLOR = "#2D1B16";
   const PAGE_FADE_DELAY_MS = 130;
-  const STARTUP_SESSION_KEY = "ldf-web-startup-beta-1.0.0-r3";
+  const STARTUP_SESSION_KEY = "ldf-web-startup-beta-1.1.2-r3";
   const STARTUP_FALLBACK_MS = 3200;
   const root = document.documentElement;
   const themeMeta = document.querySelector('meta[name="theme-color"]');
@@ -97,6 +97,14 @@
     });
   }
 
+  function renderBuildWatermarks() {
+    const identity = window.LDFRuntimeIdentity;
+    const version = identity?.releaseToken?.match(/(?:^|-)([0-9]+\.[0-9]+\.[0-9]+)$/)?.[1] || "indisponível";
+    for (const watermark of document.querySelectorAll("[data-build-watermark]")) {
+      watermark.textContent = `LDF Web · v${version}`;
+    }
+  }
+
   function showStartupBrand() {
     if (!root.classList.contains("startup-brand-pending")) return;
     const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)");
@@ -141,6 +149,7 @@
   applyTheme(readPreference());
 
   document.addEventListener("DOMContentLoaded", () => {
+    renderBuildWatermarks();
     updateButton(root.dataset.theme);
     setupPageTransitions();
     showStartupBrand();

@@ -78,7 +78,13 @@ function replaceBlock(source, replacement) {
   return source.slice(0, start) + replacement + source.slice(finish + END.length);
 }
 
-function verify(root, forcedToken) {
+function expectedSourceCommit(value) {
+  if (value === undefined || value === "") return null;
+  if (!/^[0-9a-f]{40}$/.test(value)) throw new Error("Commit da fonte inválido.");
+  return value;
+}
+
+function verify(root, forcedToken, forcedSourceCommit) {
   const token = releaseToken(root, forcedToken);
   const worker = fs.readFileSync(path.join(root, "sw.js"), "utf8");
   const normalizedWorker = Buffer.from(replaceBlock(worker, PLACEHOLDER), "utf8");
@@ -91,7 +97,8 @@ function verify(root, forcedToken) {
   inputs.sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0);
   const buildId = digest(Buffer.from(JSON.stringify(inputs)));
   const cacheName = `ldf-web-${token}-${buildId}`;
-  const identityText = `(function () {\n  "use strict";\n  window.LDFRuntimeIdentity = Object.freeze(${JSON.stringify({ releaseToken: token, buildId, cacheName })});\n})();\n`;
+  const sourceCommit = expectedSourceCommit(forcedSourceCommit);
+  const identityText = `(function () {\n  "use strict";\n  window.LDFRuntimeIdentity = Object.freeze(${JSON.stringify({ releaseToken: token, buildId, cacheName, sourceCommit })});\n})();\n`;
   if (fs.readFileSync(path.join(root, "runtime-integrity.js"), "utf8") !== identityText) {
     throw new Error("runtime-integrity.js diverge dos assets permitidos.");
   }
@@ -104,14 +111,14 @@ function verify(root, forcedToken) {
     sha256: digest(identityBytes),
     contentType: identityDefinition[2]
   });
-  const block = `${BEGIN}\nconst RELEASE_TOKEN = ${JSON.stringify(token)};\nconst BUILD_ID = ${JSON.stringify(buildId)};\nconst CACHE_NAME = ${JSON.stringify(cacheName)};\nconst RUNTIME_ASSETS = Object.freeze(${JSON.stringify(assets, null, 2)}.map(Object.freeze));\n${END}`;
+  const block = `${BEGIN}\nconst RELEASE_TOKEN = ${JSON.stringify(token)};\nconst BUILD_ID = ${JSON.stringify(buildId)};\nconst CACHE_NAME = ${JSON.stringify(cacheName)};\nconst SOURCE_COMMIT = ${JSON.stringify(sourceCommit)};\nconst RUNTIME_ASSETS = Object.freeze(${JSON.stringify(assets, null, 2)}.map(Object.freeze));\n${END}`;
   if (worker !== replaceBlock(worker, block)) throw new Error("O bloco de integridade de sw.js diverge dos assets permitidos.");
   return { token, buildId, cacheName, assetCount: assets.length };
 }
 
 try {
   const root = path.resolve(process.argv[2] || path.join(__dirname, ".."));
-  const result = verify(root, process.argv[3]);
+  const result = verify(root, process.argv[3], process.argv[4]);
   console.log(`Runtime integrity verification: PASS ${result.cacheName} (${result.assetCount} assets)`);
 } catch (error) {
   console.error(error.message);

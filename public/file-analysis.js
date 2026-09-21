@@ -56,7 +56,7 @@
     if (permanentlyUnavailableReason) {
       throw new Error(permanentlyUnavailableReason);
     }
-    worker = new Worker("file-analysis-worker.js?v=beta-1.0.0");
+    worker = new Worker("file-analysis-worker.js?v=beta-1.1.2");
     worker.addEventListener("message", handleMessage);
     worker.addEventListener("error", () => terminateWorker("O processo local de análise foi encerrado por segurança."));
     return worker;

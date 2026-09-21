@@ -24,7 +24,7 @@ $applicationFiles = @(
     "guidance.js", "pdf.js", "sha256.js", "c2pa-detector.js", "crypto.js",
     "file-analysis.js", "file-analysis-worker.js", "pdf-metadata.js", "mediainfo.min.js", "mediainfo.wasm",
     "MEDIAINFO_LICENSE.txt", "LICENSE.md", "validation.js", "temporal.js", "crypto-worker.js", "sw.js",
-    "manifest.webmanifest", "icon.svg"
+    "manifest.webmanifest", "icon.svg", "sitemap.xml", "robots.txt"
 )
 $metadataNames = @("release-manifest.json", "sbom.spdx.json", "provenance.intoto.jsonl")
 
@@ -105,6 +105,7 @@ function Assert-PayloadMatchesCommit {
     $resolvedCommit = Invoke-GitOneLine $repoRoot @("rev-parse", "$Commit^{commit}") "source commit"
     if ($resolvedCommit -cne $Commit) { throw "ExpectedSourceCommit is not present in SourceRepository." }
     foreach ($name in $payloadNames) {
+        if ($name -in @("runtime-integrity.js", "sw.js")) { continue }
         $repoPath = if ($name -ceq "_headers") { "deployment/_headers" } else { $name }
         $expectedBlob = Invoke-GitOneLine $repoRoot @("rev-parse", "${Commit}:$repoPath") "source blob $repoPath"
         if ((Invoke-GitOneLine $repoRoot @("cat-file", "-t", $expectedBlob) "source object $repoPath") -cne "blob") { throw "Source object is not a blob: $repoPath" }
@@ -159,7 +160,7 @@ if ($ExpectedDirectoryName -notmatch '^[A-Za-z0-9_][A-Za-z0-9._-]*$') { throw "E
 
 $releaseRoot = [IO.Path]::GetFullPath($ReleasePath)
 if (-not (Test-Path -LiteralPath $releaseRoot -PathType Container)) { throw "Release directory does not exist." }
-& node (Join-Path $PSScriptRoot "verify-runtime-integrity.cjs") $releaseRoot $releaseToken
+& node (Join-Path $PSScriptRoot "verify-runtime-integrity.cjs") $releaseRoot $releaseToken $ExpectedSourceCommit
 if ($LASTEXITCODE -ne 0) { throw "Runtime integrity verification failed for release." }
 Assert-NoReparseInPath $releaseRoot "Release path"
 $rootItem = Get-Item -LiteralPath $releaseRoot -Force

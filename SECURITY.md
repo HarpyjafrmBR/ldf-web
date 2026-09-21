@@ -10,7 +10,7 @@ foram executados nem que a ferramenta atende automaticamente a todo contexto de 
 
 Use preferencialmente o recurso **Private vulnerability reporting** na aba
 **Security** do [repositório oficial](https://github.com/HarpyjafrmBR/ldf-web).
-Como canal alternativo, escreva para `administrador_LDFWeb@lacredigitalforense.seg.br` com o assunto
+Como canal alternativo, escreva para `contato_ldfweb@lacredigitalforense.seg.br` com o assunto
 iniciado por `[SEGURANÇA]`. Não abra issue, discussion ou pull request público com
 detalhes exploráveis.
 

@@ -5,11 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#DAC7A1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+  <link rel="canonical" href="https://lacredigitalforense.seg.br/">
   <title>LDF Web - Lacre Digital Forense</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <script src="theme.js?v=beta-1.0.0"></script>
-  <link rel="stylesheet" href="styles.css?v=beta-1.0.0">
+  <script src="theme.js?v=beta-1.1.2"></script>
+  <link rel="stylesheet" href="styles.css?v=beta-1.1.2">
 </head>
 <body class="operational-page page-transition">
   <header class="app-header">
@@ -158,6 +159,7 @@
           </label>
           <input id="signed-declaration" class="visually-hidden" type="file" accept="application/pdf,.pdf" disabled>
           <button id="save-container" class="button success hidden" type="button">Salvar contêiner LDF</button>
+          <button id="confirm-container-download" class="button secondary hidden" type="button">Confirmar arquivo baixado</button>
           <button id="save-shipping-receipt" class="button secondary hidden" type="button">Salvar recibo de remessa</button>
         </div>
       </section>
@@ -268,6 +270,8 @@
       <div id="guidance-root" class="guidance-root"></div>
     </section>
   </main>
+
+  <footer class="build-watermark" aria-label="Identificação da versão" data-build-watermark>LDF Web · v1.1.2</footer>
 
   <dialog id="metadata-dialog">
     <form id="metadata-form" method="dialog" autocomplete="off">
@@ -529,24 +533,24 @@
   </dialog>
 
   <div id="toast-region" class="toast-region" aria-live="assertive"></div>
-  <script src="runtime-integrity.js?v=beta-1.0.0" defer></script>
-  <script src="operation-coordination.js?v=beta-1.0.0" defer></script>
-  <script src="pdf.js?v=beta-1.0.0" defer></script>
-  <script src="sha256.js?v=beta-1.0.0" defer></script>
-  <script src="c2pa-detector.js?v=beta-1.0.0" defer></script>
-  <script src="crypto.js?v=beta-1.0.0" defer></script>
-  <script src="file-analysis.js?v=beta-1.0.0" defer></script>
-  <script src="temporal.js?v=beta-1.0.0" defer></script>
-  <script src="guidance-content.js?v=beta-1.0.0" defer></script>
-  <script src="guidance.js?v=beta-1.0.0" defer></script>
-  <script src="validation.js?v=beta-1.0.0" defer></script>
-  <script src="app-core.js?v=beta-1.0.0" defer></script>
-  <script src="app-ui.js?v=beta-1.0.0" defer></script>
-  <script src="app-file-io.js?v=beta-1.0.0" defer></script>
-  <script src="app-lot.js?v=beta-1.0.0" defer></script>
-  <script src="app-sealing.js?v=beta-1.0.0" defer></script>
-  <script src="app-audit.js?v=beta-1.0.0" defer></script>
-  <script src="app-offline.js?v=beta-1.0.0" defer></script>
-  <script src="app.js?v=beta-1.0.0" defer></script>
+  <script src="runtime-integrity.js?v=beta-1.1.2" defer></script>
+  <script src="operation-coordination.js?v=beta-1.1.2" defer></script>
+  <script src="pdf.js?v=beta-1.1.2" defer></script>
+  <script src="sha256.js?v=beta-1.1.2" defer></script>
+  <script src="c2pa-detector.js?v=beta-1.1.2" defer></script>
+  <script src="crypto.js?v=beta-1.1.2" defer></script>
+  <script src="file-analysis.js?v=beta-1.1.2" defer></script>
+  <script src="temporal.js?v=beta-1.1.2" defer></script>
+  <script src="guidance-content.js?v=beta-1.1.2" defer></script>
+  <script src="guidance.js?v=beta-1.1.2" defer></script>
+  <script src="validation.js?v=beta-1.1.2" defer></script>
+  <script src="app-core.js?v=beta-1.1.2" defer></script>
+  <script src="app-ui.js?v=beta-1.1.2" defer></script>
+  <script src="app-file-io.js?v=beta-1.1.2" defer></script>
+  <script src="app-lot.js?v=beta-1.1.2" defer></script>
+  <script src="app-sealing.js?v=beta-1.1.2" defer></script>
+  <script src="app-audit.js?v=beta-1.1.2" defer></script>
+  <script src="app-offline.js?v=beta-1.1.2" defer></script>
+  <script src="app.js?v=beta-1.1.2" defer></script>
 </body>
 </html>

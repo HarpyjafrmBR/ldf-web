@@ -134,6 +134,6 @@ O descumprimento desta licença encerra automaticamente as permissões concedida
 regularização não restaura autorizações sem manifestação escrita do Projeto. Aplica-se
 a legislação brasileira, sem prejuízo de direitos inderrogáveis.
 
-Contato geral e de segurança: `administrador_LDFWeb@lacredigitalforense.seg.br`
+Contato geral e de segurança: `contato_ldfweb@lacredigitalforense.seg.br`
 Página oficial: `https://lacredigitalforense.seg.br`  
 Repositório oficial: `https://github.com/HarpyjafrmBR/ldf-web`.

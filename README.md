@@ -1,4 +1,4 @@
-# LDF Web v1.0.0
+# LDF Web v1.1.2
 
 **Canal de release:** Beta
 
@@ -13,7 +13,7 @@ uso está em [`public/`](public/); seus arquivos e hashes constam em
 autenticidade externa; confirme o commit e os hashes por canal independente.
 
 - Repositório oficial: [HarpyjafrmBR/ldf-web](https://github.com/HarpyjafrmBR/ldf-web)
-- Contato: `administrador_LDFWeb@lacredigitalforense.seg.br`
+- Contato: `contato_ldfweb@lacredigitalforense.seg.br`
 - Site oficial planejado: `https://lacredigitalforense.seg.br`
 
 Todos os direitos reservados ao Projeto LDF Web.

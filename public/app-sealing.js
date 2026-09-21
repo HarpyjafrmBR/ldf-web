@@ -159,7 +159,12 @@
         lotController.addLog(`Declaração de registro emitida: ${fileName}`);
         lotController.addLog(`Identificador da declaração: ${store.documentId}`);
         lotController.addLog(`SHA-256 do conjunto qualificado: ${store.qualifiedLotHash}`);
-        sealingUi.showToast("Declaração de registro gerada. Assine o PDF e selecione-o no Passo 2.");
+        if (saveResult === "download-requested") {
+          lotController.addLog(`Download da declaração de registro solicitado: ${fileName} [DOWNLOAD_REQUESTED].`, "warning");
+          sealingUi.showToast("Download da declaração de registro solicitado. Confirme a conclusão no navegador, assine o PDF e selecione-o no Passo 2.", "warning");
+        } else {
+          sealingUi.showToast("Declaração de registro gerada. Assine o PDF e selecione-o no Passo 2.");
+        }
       } catch (error) {
         sealingUi.showToast(sealingUi.friendlyErrorMessage(error, "gerar ou salvar a declaração de registro"), "error");
       } finally {
@@ -325,7 +330,9 @@
         elements.signedInput.disabled = true;
         elements.signedLabel.classList.add("disabled");
         elements.lotSecretHelp.textContent = "A chave foi capturada para este fechamento e retirada da tela. Salve o contêiner ou reinicie a operação.";
+        elements.saveContainerButton.textContent = "Salvar contêiner LDF";
         elements.saveContainerButton.classList.remove("hidden");
+        elements.confirmContainerDownloadButton.classList.add("hidden");
         lotController.addLog("Declaração selecionada; conferências técnicas locais concluídas.");
         sealingUi.showToast("Lote preparado. Escolha onde deseja salvar o contêiner LDF Web.");
       } catch (error) {
@@ -337,6 +344,56 @@
         sealingUi.setActivityProgress("operation-progress", false);
         sealingUi.endExclusiveRoutine();
       }
+    }
+
+    function finalizeConfirmedContainer(plan, saveResult, persistenceConfirmation) {
+      plan.secret = "";
+      transitions.setContainerSaved(true);
+      transitions.setPendingContainer(null);
+      elements.stepTwo.className = "step";
+      elements.saveContainerButton.classList.add("hidden");
+      elements.saveContainerButton.textContent = "Salvar contêiner LDF";
+      elements.confirmContainerDownloadButton.classList.add("hidden");
+      lotController.addLog(`Contêiner LDF Web salvo: ${plan.fileName}`);
+      lotController.addLog(`SHA-256 do contêiner: ${saveResult.sha256}`);
+      lotController.addLog(
+        persistenceConfirmation === "manual"
+          ? "Persistência do contêiner informada manualmente pelo operador após conferência do download [MANUAL_CONFIRMED]."
+          : "Persistência do contêiner confirmada pela API de gravação do navegador."
+      );
+
+      const receiptFileName = `Recibo_Remessa_${domain.safeName(plan.internalReport.lotCode)}_${domain.compactTimestamp()}.pdf`;
+      try {
+        transitions.setShippingReceipt({
+          blob: pdfApi.shippingReceipt({
+            documentId: domain.newDocumentId("REM"),
+            lotCode: plan.internalReport.lotCode,
+            fileName: plan.fileName,
+            containerHash: saveResult.sha256,
+            persistenceConfirmation
+          }),
+          fileName: receiptFileName
+        });
+        elements.saveShippingReceiptButton.classList.remove("hidden");
+        sealingUi.showToast("Contêiner salvo. Salve também o recibo de remessa.");
+      } catch {
+        transitions.setShippingReceipt(null);
+        lotController.addLog("O contêiner foi salvo, mas o recibo de remessa não pôde ser gerado.", "warning");
+        sealingUi.showToast("O contêiner foi salvo e a chave foi descartada, mas o recibo não pôde ser gerado.", "warning");
+      }
+    }
+
+    function confirmFallbackContainerDownload() {
+      const plan = store.pendingContainer;
+      if (!plan?.fallbackArtifact) return;
+      const confirmed = sealingUi.confirmManualDownload(
+        "Confirme somente se você verificou que o download do contêiner LDF foi concluído no navegador. Esta declaração manual não realiza uma conferência automática do arquivo."
+      );
+      if (!confirmed) {
+        sealingUi.showToast("A confirmação manual não foi registrada. O contêiner permanece pendente e o download pode ser solicitado novamente.", "warning");
+        return;
+      }
+      finalizeConfirmedContainer(plan, plan.fallbackArtifact, "manual");
     }
 
     async function savePendingContainer() {
@@ -377,32 +434,15 @@
           sealingUi.showToast("O salvamento do contêiner foi cancelado. Você pode tentar novamente.", "warning");
           return;
         }
-        plan.secret = "";
-        transitions.setContainerSaved(true);
-        transitions.setPendingContainer(null);
-        elements.stepTwo.className = "step";
-        elements.saveContainerButton.classList.add("hidden");
-        lotController.addLog(`Contêiner LDF Web salvo: ${plan.fileName}`);
-        lotController.addLog(`SHA-256 do contêiner: ${saveResult.sha256}`);
-
-        const receiptFileName = `Recibo_Remessa_${domain.safeName(plan.internalReport.lotCode)}_${domain.compactTimestamp()}.pdf`;
-        try {
-          transitions.setShippingReceipt({
-            blob: pdfApi.shippingReceipt({
-              documentId: domain.newDocumentId("REM"),
-              lotCode: plan.internalReport.lotCode,
-              fileName: plan.fileName,
-              containerHash: saveResult.sha256
-            }),
-            fileName: receiptFileName
-          });
-          elements.saveShippingReceiptButton.classList.remove("hidden");
-          sealingUi.showToast("Contêiner salvo. Salve também o recibo de remessa.");
-        } catch {
-          transitions.setShippingReceipt(null);
-          lotController.addLog("O contêiner foi salvo, mas o recibo de remessa não pôde ser gerado.", "warning");
-          sealingUi.showToast("O contêiner foi salvo e a chave foi descartada, mas o recibo não pôde ser gerado.", "warning");
+        if (saveResult.status === "download-requested") {
+          elements.saveContainerButton.textContent = "Solicitar download novamente";
+          elements.confirmContainerDownloadButton.classList.remove("hidden");
+          lotController.addLog(`Download do contêiner solicitado: ${plan.fileName} [DOWNLOAD_REQUESTED].`, "warning");
+          lotController.addLog(`SHA-256 do contêiner preparado: ${saveResult.sha256}`);
+          sealingUi.showToast("Download do contêiner solicitado. Verifique a conclusão no navegador; depois, confirme o arquivo baixado ou solicite o download novamente.", "warning");
+          return;
         }
+        finalizeConfirmedContainer(plan, saveResult, "api");
       } catch (error) {
         const message = sealingUi.friendlyErrorMessage(error, "salvar o contêiner LDF Web");
         if (error?.diagnostic) {
@@ -439,6 +479,11 @@
           sealingUi.showToast("O salvamento do recibo de remessa foi cancelado. Você pode tentar novamente.", "warning");
           return;
         }
+        if (result === "download-requested") {
+          lotController.addLog(`Download do recibo de remessa solicitado: ${store.shippingReceipt.fileName} [DOWNLOAD_REQUESTED].`, "warning");
+          sealingUi.showToast("Download do recibo de remessa solicitado. Confirme a conclusão no navegador; a ação permanece disponível para nova tentativa.", "warning");
+          return;
+        }
         lotController.addLog(`Recibo de remessa salvo: ${store.shippingReceipt.fileName}`);
         sealingUi.showToast("Recibo de remessa salvo com sucesso.");
         transitions.setShippingReceipt(null);
@@ -468,6 +513,7 @@
       guardSignedDeclarationSelection,
       sealSignedDeclaration,
       savePendingContainer,
+      confirmFallbackContainerDownload,
       saveShippingReceipt
     });
   }
