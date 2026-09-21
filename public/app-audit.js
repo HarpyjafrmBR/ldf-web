@@ -230,6 +230,8 @@
         const saveResult = await auditFileIo.saveBlob(store.auditPdf, store.auditPdfName);
         if (saveResult === "cancelled") {
           auditUi.showToast("O salvamento da declaração de recebimento foi cancelado.", "warning");
+        } else if (saveResult === "download-requested") {
+          auditUi.showToast("Download da declaração de recebimento solicitado. Confirme a conclusão no navegador; a ação permanece disponível para nova tentativa.", "warning");
         } else {
           auditUi.showToast("Revise e assine externamente a Declaração de Recebimento. Este documento não é enviado automaticamente para o remetente.");
         }
@@ -433,6 +435,8 @@
         const result = await auditFileIo.saveProtectedRecord(item);
         if (result === "cancelled") {
           auditUi.showToast("O salvamento do arquivo foi cancelado.", "warning");
+        } else if (result === "download-requested") {
+          auditUi.showToast(`Download solicitado: ${item.name}. Confirme a conclusão no navegador; a ação permanece disponível para nova tentativa.`, "warning");
         } else {
           auditUi.showToast(`Arquivo salvo: ${item.name}`);
         }

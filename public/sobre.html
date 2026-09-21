@@ -6,11 +6,12 @@
   <meta name="theme-color" content="#DAC7A1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; worker-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="description" content="Conheça a finalidade, o funcionamento, as garantias e os limites do LDF Web — Lacre Digital Forense.">
+  <link rel="canonical" href="https://lacredigitalforense.seg.br/sobre">
   <title>Sobre o LDF Web — Lacre Digital Forense</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <script src="theme.js?v=beta-1.0.0"></script>
-  <link rel="stylesheet" href="styles.css?v=beta-1.0.0">
+  <script src="theme.js?v=beta-1.1.0"></script>
+  <link rel="stylesheet" href="styles.css?v=beta-1.1.0">
 </head>
 <body class="about-page page-transition">
   <header class="app-header about-header">
@@ -127,7 +128,7 @@
           contribuições nos termos da Licença do Projeto LDF Web 1.0.
         </p>
         <p class="about-source-status" data-source-state="published">
-          Repositório oficial: <a href="https://github.com/HarpyjafrmBR/ldf-web" target="_blank" rel="noopener noreferrer">ldf-web (GitHub)</a>.
+          Repositório oficial:&nbsp;<a href="https://github.com/HarpyjafrmBR/ldf-web" target="_blank" rel="noopener noreferrer">ldf-web (GitHub)</a>
         </p>
       </section>
 
@@ -197,43 +198,70 @@
         <summary>Principais perguntas e respostas</summary>
         <div class="about-faq-list">
           <details class="about-faq-item">
-            <summary>Como conferir se estou usando o LDF Web oficial?</summary>
-            <p>Confira o endereço oficial, o HTTPS, a versão no rodapé e o <a href="https://github.com/HarpyjafrmBR/ldf-web" target="_blank" rel="noopener noreferrer">repositório público no GitHub</a>. Compare também os hashes publicados.</p>
+            <summary>1. O LDF Web é confiável?</summary>
+            <div class="about-faq-answer">
+              <p>
+                O LDF Web foi desenvolvido com atenção à segurança, à integridade e à
+                transparência. Sua arquitetura <strong>local-first</strong> mantém o
+                processamento dos vestígios, das chaves e dos dados da operação no seu
+                dispositivo, sem enviá-los ao servidor. Como <strong>PWA — aplicativo web
+                que pode ser instalado no computador ou celular</strong>, mantém os recursos
+                necessários no navegador e permite realizar as operações essenciais sem
+                internet, após a preparação inicial online.
+              </p>
+              <p>
+                A proteção combina diferentes camadas: <strong>HTTPS/TLS</strong>, para
+                proteger a conexão com o site; <strong>Política de Segurança de Conteúdo
+                (CSP)</strong>, que restringe quais scripts e recursos a página pode executar
+                ou carregar, ajudando a prevenir a execução de conteúdo não autorizado;
+                <strong>verificação de integridade dos componentes</strong>, antes de liberar
+                a operação; e <strong>criptografia autenticada AES-256-GCM</strong>, para
+                proteger o conteúdo dos contêineres. Os hashes <strong>SHA-256</strong>
+                permitem conferir a integridade dos vestígios.
+              </p>
+              <p>Você também pode verificar esses cuidados na prática:</p>
+              <ul>
+                <li><strong>Compare os hashes SHA-256:</strong> calcule o hash do mesmo arquivo em outra ferramenta e confira se os resultados coincidem.</li>
+                <li><strong>Confira a distribuição:</strong> compare os arquivos utilizados com os hashes de <code>SHA256SUMS.txt</code> da release oficial no GitHub, onde o código está disponível para inspeção.</li>
+                <li><strong>Examine o processamento local:</strong> com arquivos de teste, acompanhe a aba “Rede” (<em>Network</em>) do navegador para verificar se alguma requisição envia seu conteúdo. Após a preparação, também é possível testar a operação sem internet.</li>
+              </ul>
+              <p>Assegure-se de acessar a página oficial da ferramenta. Mantenha seu navegador e seu dispositivo protegidos e atualizados.</p>
+            </div>
           </details>
           <details class="about-faq-item">
-            <summary>Consigo fechar ou abrir um lote sem internet? E com o site indisponível?</summary>
+            <summary>2. Consigo fechar ou abrir um lote sem internet? E com o site indisponível?</summary>
             <p>Sim, desde que o LDF Web tenha sido inicializado anteriormente no mesmo dispositivo, navegador e perfil.</p>
           </details>
           <details class="about-faq-item">
-            <summary>Posso instalar o LDF Web no computador?</summary>
+            <summary>3. Posso instalar o LDF Web no computador?</summary>
             <p>Sim. Chrome e Edge permitem instalá-lo como aplicativo web, sem instalador tradicional. A instalação também facilita o uso offline.</p>
           </details>
           <details class="about-faq-item">
-            <summary>Perdi a chave de acesso. O sistema consegue recuperá-la?</summary>
+            <summary>4. Perdi a chave de acesso. O sistema consegue recuperá-la?</summary>
             <p>Não. A chave nunca é enviada ou armazenada pelo LDF Web. Sem ela, o lote protegido não poderá ser aberto.</p>
           </details>
           <details class="about-faq-item">
-            <summary>Meus vestígios ou dados da operação são enviados para a internet?</summary>
+            <summary>5. Meus vestígios ou dados da operação são enviados para a internet?</summary>
             <p>Não. Vestígios, chave e informações do lote são processados localmente. A conexão serve para carregar ou atualizar o aplicativo.</p>
           </details>
           <details class="about-faq-item">
-            <summary>O que a conferência do hash comprova?</summary>
+            <summary>6. O que a conferência do hash comprova?</summary>
             <p>Hashes iguais indicam conteúdo binário idêntico. Isso ajuda a detectar alterações, mas não comprova sozinho autoria, origem, veracidade ou validade jurídica.</p>
           </details>
           <details class="about-faq-item">
-            <summary>O LDF Web assina ou valida a assinatura da declaração?</summary>
+            <summary>7. O LDF Web assina ou valida a assinatura da declaração?</summary>
             <p>Não. Ele gera a declaração e inclui o PDF assinado no lote. A assinatura deve ser realizada externamente e conferida em serviço confiável.</p>
           </details>
           <details class="about-faq-item">
-            <summary>O que devo preservar depois de criar um lote?</summary>
+            <summary>8. O que devo preservar depois de criar um lote?</summary>
             <p>Preserve o contêiner LDF, os originais disponíveis, a declaração e os registros do procedimento. Guarde a chave separadamente e com segurança.</p>
           </details>
           <details class="about-faq-item">
-            <summary>Por que os controles ficam bloqueados quando a preparação falha?</summary>
+            <summary>9. Por que os controles ficam bloqueados quando a preparação falha?</summary>
             <p>Para impedir o início de uma operação sem confirmar que todos os componentes locais estão íntegros.</p>
           </details>
           <details class="about-faq-item">
-            <summary>O que acontece se eu fechar ou atualizar a página durante uma operação?</summary>
+            <summary>10. O que acontece se eu fechar ou atualizar a página durante uma operação?</summary>
             <p>A operação pode ser interrompida e os dados ainda não salvos podem ser descartados. Aguarde a conclusão do fechamento ou da abertura do lote e salve os arquivos gerados antes de fechar, atualizar ou sair da página.</p>
           </details>
         </div>
@@ -242,13 +270,16 @@
       <footer class="about-document-footer">
         <a class="button primary" href="index.html" data-page-transition>Voltar à ferramenta</a>
         <div class="about-project-meta">
-          <p>LDF Web — Lacre Digital Forense · v1.0.0 · Beta</p>
-          <p>Contato: <a href="mailto:administrador_LDFWeb@lacredigitalforense.seg.br">administrador_LDFWeb@lacredigitalforense.seg.br</a></p>
-          <p>Todos os direitos reservados ao Projeto LDF Web.</p>
+          <p>LDF Web — Lacre Digital Forense · v1.1.0</p>
+          <p>E-mail: <a href="mailto:contato_ldfweb@lacredigitalforense.seg.br">contato_ldfweb@lacredigitalforense.seg.br</a></p>
+          <p>Copyright © 2026 Projeto LDF Web</p>
         </div>
       </footer>
     </article>
   </main>
 
+  <footer class="build-watermark" aria-label="Identificação da build" data-build-watermark>LDF Web · v1.1.0 (commit local)</footer>
+
+  <script src="runtime-integrity.js?v=beta-1.1.0" defer></script>
 </body>
 </html>

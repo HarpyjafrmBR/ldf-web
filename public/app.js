@@ -31,8 +31,9 @@
   const RUNTIME_IDENTITY = window.LDFRuntimeIdentity;
   const operationCoordination = window.LDFOperationCoordination;
   if (!RUNTIME_IDENTITY
-    || RUNTIME_IDENTITY.releaseToken !== "beta-1.0.0"
+    || RUNTIME_IDENTITY.releaseToken !== "beta-1.1.0"
     || !/^[0-9a-f]{64}$/.test(RUNTIME_IDENTITY.buildId)
+    || !(RUNTIME_IDENTITY.sourceCommit === null || /^[0-9a-f]{40}$/.test(RUNTIME_IDENTITY.sourceCommit))
     || RUNTIME_IDENTITY.cacheName !== `ldf-web-${RUNTIME_IDENTITY.releaseToken}-${RUNTIME_IDENTITY.buildId}`) {
     throw new Error("Identidade da build indisponível ou divergente.");
   }
@@ -565,6 +566,7 @@
       stepOne: byId("step-one"),
       stepTwo: byId("step-two"),
       saveContainerButton: byId("save-container"),
+      confirmContainerDownloadButton: byId("confirm-container-download"),
       saveShippingReceiptButton: byId("save-shipping-receipt")
     }),
     ui: Object.freeze({
@@ -573,7 +575,8 @@
       beginExclusiveRoutine,
       endExclusiveRoutine,
       setActivityProgress,
-      setCreateControlsLocked
+      setCreateControlsLocked,
+      confirmManualDownload: message => window.confirm(message)
     }),
     lot: Object.freeze({ addLog }),
     temporal: Object.freeze({
@@ -603,6 +606,7 @@
     guardSignedDeclarationSelection,
     sealSignedDeclaration,
     savePendingContainer,
+    confirmFallbackContainerDownload,
     saveShippingReceipt
   } = sealing;
 
@@ -627,6 +631,9 @@
       const result = await saveBlob(pdf, fileName);
       if (result === "cancelled") {
         showToast("O salvamento da trilha da operação foi cancelado.", "warning");
+      } else if (result === "download-requested") {
+        addLog(`Download da trilha da operação solicitado: ${fileName} [DOWNLOAD_REQUESTED].`, "warning");
+        showToast("Download da trilha da operação solicitado. Confirme a conclusão no navegador; a ação permanece disponível para nova tentativa.", "warning");
       } else {
         addLog(`Trilha da operação salva: ${fileName}`);
         showToast("Trilha da operação salva.");
@@ -657,6 +664,9 @@
     byId("signed-label").classList.add("disabled");
     byId("save-container").classList.add("hidden");
     byId("save-container").disabled = false;
+    byId("save-container").textContent = "Salvar contêiner LDF";
+    byId("confirm-container-download").classList.add("hidden");
+    byId("confirm-container-download").disabled = false;
     byId("save-shipping-receipt").classList.add("hidden");
     byId("save-shipping-receipt").disabled = false;
     byId("step-one").className = "step current";
@@ -966,6 +976,7 @@
   byId("signed-label").addEventListener("click", guardSignedDeclarationSelection);
   signedInput.addEventListener("change", () => sealSignedDeclaration(signedInput.files[0]));
   byId("save-container").addEventListener("click", savePendingContainer);
+  byId("confirm-container-download").addEventListener("click", confirmFallbackContainerDownload);
   byId("save-shipping-receipt").addEventListener("click", saveShippingReceipt);
   byId("reset-operation").addEventListener("click", resetOperation);
   byId("reset-audit").addEventListener("click", resetAudit);

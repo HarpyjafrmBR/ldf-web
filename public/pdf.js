@@ -293,6 +293,13 @@
         value: data.containerHash,
         fullWidth: true,
         size: 7.2
+      },
+      {
+        label: "Confirmação da gravação",
+        value: data.persistenceConfirmation === "manual"
+          ? "Informada manualmente pelo operador após conferência do download"
+          : "Confirmada automaticamente pela API de gravação do navegador",
+        fullWidth: true
       }
     ]);
 

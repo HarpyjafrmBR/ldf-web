@@ -15,7 +15,10 @@
   }
 
   function renderList(items) {
-    return items.map(item => `<li>${escapeHtml(item)}</li>`).join("");
+    return items.map(item => {
+      const lines = Array.isArray(item?.lines) ? item.lines : [item];
+      return `<li>${lines.map(escapeHtml).join("<br>")}</li>`;
+    }).join("");
   }
 
   function renderPrinciples() {

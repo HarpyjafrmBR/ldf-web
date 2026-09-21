@@ -27,7 +27,8 @@ $releaseFiles = @(
     "guidance-content.js", "guidance.js", "icon.svg", "index.html", "manifest.webmanifest",
     "pdf.js", "provenance.intoto.jsonl", "release-manifest.json", "sbom.spdx.json",
     "sha256.js", "sobre.html", "styles.css", "sw.js", "temporal.js", "theme.js", "runtime-integrity.js", "operation-coordination.js", "validation.js",
-    "mediainfo.min.js", "mediainfo.wasm", "MEDIAINFO_LICENSE.txt", "LICENSE.md"
+    "mediainfo.min.js", "mediainfo.wasm", "MEDIAINFO_LICENSE.txt", "LICENSE.md",
+    "sitemap.xml", "robots.txt"
 )
 $renamedSources = @{
     ".gitattributes" = "PUBLIC_GITATTRIBUTES"
@@ -217,7 +218,7 @@ foreach ($descriptor in @($manifest.files)) {
 }
 Assert-ExactOrderedNames ([string[]]$manifestNames.ToArray()) $manifestExpectedNames "Public manifest file list"
 
-$textExtensions = @(".cjs", ".css", ".html", ".js", ".json", ".jsonl", ".md", ".ps1", ".svg", ".txt", ".webmanifest", ".yml", "")
+$textExtensions = @(".cjs", ".css", ".html", ".js", ".json", ".jsonl", ".md", ".ps1", ".svg", ".txt", ".webmanifest", ".xml", ".yml", "")
 foreach ($name in $tree.Files) {
     $extension = [IO.Path]::GetExtension($name).ToLowerInvariant()
     if ($textExtensions -contains $extension) {

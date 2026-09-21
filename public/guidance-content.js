@@ -6,7 +6,7 @@
    * revisar recomendações e referências sem alterar criptografia, PDFs ou contêineres.
    */
   window.LDFGuidanceContent = Object.freeze({
-    version: "Beta 1.0.0",
+    version: "Beta 1.1.0",
     reviewedAt: "06/08/2026",
     introduction: {
       title: "Antes de interagir com um possível vestígio digital",
@@ -98,7 +98,12 @@
       title: "Pare e procure apoio especializado",
       introduction: "Evite novas interações e solicite orientação quando ocorrer uma destas situações:",
       items: [
-        "for necessária a coleta de dados voláteis com o equipamento ligado, ou quando o procedimento envolver sistemas em execução, conexões de rede e nuvem;",
+        {
+          lines: [
+            "for necessária a coleta de dados voláteis com o equipamento ligado,",
+            "ou quando o procedimento envolver sistemas em execução, conexões de rede e nuvem;"
+          ]
+        },
         "houver risco de sobrescrita, exclusão automática, criptografia ou perda de sessão;",
         "for necessário romper acesso, desmontar equipamento ou alterar sua configuração;",
         "o conteúdo envolver intimidade, crianças, adolescentes, ameaça ou risco pessoal;",

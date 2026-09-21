@@ -61,6 +61,7 @@
       anchor.click();
       anchor.remove();
       fileApi.schedule(() => fileApi.revokeObjectUrl(url), 30000);
+      return "download-requested";
     }
 
     /*
@@ -98,8 +99,7 @@
           throw error;
         }
       }
-      downloadBlobFallback(blob, fileName);
-      return "fallback";
+      return downloadBlobFallback(blob, fileName);
     }
 
     /*
@@ -210,19 +210,27 @@
           `Este navegador não oferece gravação progressiva. Para lotes acima de ${feedback.formatBytes(limits.memoryFallbackBytes)}, utilize uma versão atual do Chrome ou Edge.`
         );
       }
-      const blob = await cryptoApi.sealContainer(
-        plan.secret,
-        plan.internalReport,
-        plan.payloads,
-        onProgress,
-        plan.progressMessages
-      );
-      const containerHash = await cryptoApi.sha256Blob(blob);
-      downloadBlobFallback(blob, plan.fileName);
+      if (!plan.fallbackArtifact) {
+        const blob = await cryptoApi.sealContainer(
+          plan.secret,
+          plan.internalReport,
+          plan.payloads,
+          onProgress,
+          plan.progressMessages
+        );
+        const containerHash = await cryptoApi.sha256Blob(blob);
+        plan.fallbackArtifact = Object.freeze({
+          blob,
+          sha256: containerHash,
+          size: blob.size
+        });
+        plan.secret = "";
+      }
+      downloadBlobFallback(plan.fallbackArtifact.blob, plan.fileName);
       return {
-        status: "fallback",
-        sha256: containerHash,
-        size: blob.size
+        status: "download-requested",
+        sha256: plan.fallbackArtifact.sha256,
+        size: plan.fallbackArtifact.size
       };
     }
 
@@ -268,7 +276,7 @@
         { type: item.mimeType || "application/octet-stream" }
       );
       downloadBlobFallback(blob, item.name);
-      return "fallback";
+      return "download-requested";
     }
 
     return Object.freeze({ saveBlob, saveContainerPlan, saveProtectedRecord });

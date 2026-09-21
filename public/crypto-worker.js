@@ -2,7 +2,7 @@
  * O Worker executa o SHA-256 fora da thread da interface. Arquivos grandes são
  * lidos em partes e apenas o estado matemático do hash permanece entre elas.
  */
-importScripts("sha256.js?v=beta-1.0.0", "c2pa-detector.js?v=beta-1.0.0");
+importScripts("sha256.js?v=beta-1.1.0", "c2pa-detector.js?v=beta-1.1.0");
 
 "use strict";
 

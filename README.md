@@ -1,4 +1,4 @@
-# LDF Web v1.0.0
+# LDF Web v1.1.0
 
 **Canal de release:** Beta
 
