@@ -6,7 +6,7 @@
    * revisar recomendações e referências sem alterar criptografia, PDFs ou contêineres.
    */
   window.LDFGuidanceContent = Object.freeze({
-    version: "Beta 1.1.2",
+    version: "Beta 2.0.0",
     reviewedAt: "06/08/2026",
     introduction: {
       title: "Antes de interagir com um possível vestígio digital",

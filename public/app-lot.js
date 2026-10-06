@@ -21,6 +21,78 @@
     randomUUID,
     createElement
   }) {
+    const reusedSources = new Map();
+    const reusableFields = Object.freeze({
+      "meta-id": ["metaId", "id"], "meta-nature": ["metaNature", "nature"],
+      "meta-responsible": ["metaResponsible", "responsible"], "meta-location": ["metaLocation", "location"],
+      "meta-description": ["metaDescription", "description"], "meta-unavailability-reason": ["metaUnavailabilityReason", "unavailabilityReason"]
+    });
+
+    function reusableEvidence() {
+      return store.evidence.filter(item => item.id !== store.editingEvidenceId && Boolean(item.metadata));
+    }
+
+    function discardReuseReference(fieldId) { reusedSources.delete(fieldId); }
+
+    function refreshReuseControls() {
+      const candidates = reusableEvidence();
+      for (const select of elements.reuseControls ?? []) {
+        select.replaceChildren();
+        const empty = createElement("option");
+        empty.value = "";
+        empty.textContent = "Selecione outro vestígio qualificado";
+        select.append(empty);
+        for (const item of candidates) {
+          const option = createElement("option");
+          option.value = item.id;
+          option.textContent = `${item.metadata.id} · ${item.file.name}`;
+          select.append(option);
+        }
+        select.disabled = !candidates.length;
+        select.closest("details").hidden = !candidates.length;
+        select.closest("details").open = false;
+      }
+    }
+
+    function copyMetadataField(fieldId, sourceId) {
+      if (store.locked || !store.runtimeReady || !store.editingEvidenceId || !elements.metadataDialog.open) return false;
+      const source = reusableEvidence().find(item => item.id === sourceId);
+      if (!source) {
+        refreshReuseControls();
+        lotUi.showToast("O vestígio escolhido não está mais disponível para reaproveitar dados.", "warning");
+        return false;
+      }
+      try {
+        const metadata = source.metadata;
+        if (Object.prototype.hasOwnProperty.call(reusableFields, fieldId)) {
+          const [elementName, key] = reusableFields[fieldId];
+          elements[elementName].value = metadata[key] ?? "";
+        } else if (fieldId === "meta-datetime") {
+          const date = domain.inputDateToBrazilian(metadata.inputDateTime);
+          domain.brazilianDateTimeToInput(date);
+          elements.metaDateTime.value = date;
+          elements.metaDateTimePicker.value = metadata.inputDateTime;
+        } else if (fieldId === "meta-source-type") {
+          const sourceInformation = parseSourceInformation(metadata.unavailability);
+          elements.metaSourceTypes.forEach(input => { input.checked = input.value === sourceInformation.sourceType; });
+        } else if (fieldId === "meta-unavailability") {
+          elements.metaUnavailability.value = parseSourceInformation(metadata.unavailability).details;
+        } else return false;
+        reusedSources.set(fieldId, sourceId);
+        // Reaproveitar um campo não limpa avisos de outros campos nem copia dependentes.
+        const target = fieldId === "meta-source-type" ? elements.metaSourceTypes[0]
+          : fieldId === "meta-datetime" ? elements.metaDateTime
+          : fieldId === "meta-unavailability" ? elements.metaUnavailability : elements[reusableFields[fieldId][0]];
+        lotUi.validateFields?.([[target, true]]);
+        if (fieldId === "meta-unavailability-reason") updateSourceDetailsVisibility(undefined, { preserveValue: true });
+        updateQualificationProgress();
+        if (elements.reuseStatus) elements.reuseStatus.textContent = "Campo reaproveitado. Confira os dados antes de revisar e gravar.";
+        return true;
+      } catch (error) {
+        lotUi.showToast(lotUi.friendlyErrorMessage(error, "reaproveitar o campo"), "error");
+        return false;
+      }
+    }
     function confirmLargeSelection(files, projectedBytes, projectedCount) {
       if (!files.length) return true;
       const reasons = [];
@@ -216,6 +288,7 @@
 
     function renderEvidence() {
       const hasEvidence = store.evidence.length > 0;
+      if (hasEvidence) store.hasShownEvidenceList = true;
       elements.evidenceEmpty.classList.toggle("hidden", hasEvidence);
       elements.evidenceList.classList.toggle("hidden", !hasEvidence);
       elements.evidenceCount.textContent = hasEvidence
@@ -248,6 +321,7 @@
           </div>
         </article>
       `).join("");
+      lotUi.refreshCreationPresentation?.();
     }
 
     async function addEvidenceFiles(files) {
@@ -389,16 +463,30 @@
     function updateQualificationProgress() {
       const status = elements.metaUnavailabilityReason.value;
       const details = elements.metaUnavailability.value;
+      let validDateTime = false;
+      try {
+        validDateTime = validationApi.isCollectionDateTimeOnOrBefore(
+          domain.brazilianDateTimeToInput(elements.metaDateTime.value.trim()),
+          domain.localDateTime()
+        );
+      } catch {
+        // O bloco permanece em preenchimento até haver data e hora válidas.
+      }
       const blockStates = [
         qualificationBlockState([elements.metaId.value, elements.metaNature.value]),
         qualificationBlockState([
           elements.metaResponsible.value,
           elements.metaDateTime.value,
           elements.metaLocation.value
+        ], [
+          validationApi.isValidPersonalName(elements.metaResponsible.value) ? "valid" : "",
+          validDateTime ? "valid" : "",
+          elements.metaLocation.value.trim()
         ]),
         qualificationBlockState(
           [selectedSourceType(), elements.metaDescription.value, status, details],
-          [selectedSourceType(), elements.metaDescription.value, status, status === "other" ? details : "not-required"]
+          [selectedSourceType() in sourceTypeLabels ? "valid" : "", elements.metaDescription.value,
+            status in primarySourceStatusLabels ? "valid" : "", status === "other" ? details : "not-required"]
         )
       ];
       blockStates.forEach((state, index) => setQualificationStatus(index + 1, state));
@@ -428,6 +516,9 @@
       const item = store.evidence.find(entry => entry.id === itemId);
       if (!item || store.locked) return;
       store.editingEvidenceId = itemId;
+      reusedSources.clear();
+      refreshReuseControls();
+      if (elements.reuseStatus) elements.reuseStatus.textContent = "";
       const metadata = item.metadata ?? {};
       store.editingPhotos = (metadata.photos ?? []).map(photo => ({ ...photo }));
       store.editingDocuments = (metadata.documents ?? []).map(document => ({ ...document }));
@@ -438,6 +529,7 @@
       const inputDateTime = metadata.inputDateTime ?? domain.dateTimeInputValue();
       elements.metaDateTime.value = domain.inputDateToBrazilian(inputDateTime);
       elements.metaDateTimePicker.value = inputDateTime;
+      elements.metaDateTimePicker.max = domain.dateTimeInputValue();
       elements.metaLocation.value = metadata.location ?? "";
       elements.metaDescription.value = metadata.description ?? "";
       const sourceInformation = parseSourceInformation(metadata.unavailability);
@@ -451,6 +543,7 @@
       renderMetadataPhotos();
       renderMetadataDocuments();
       updateQualificationProgress();
+      lotUi.clearFieldErrors?.(elements.metadataForm);
       elements.metadataDialog.showModal();
     }
 
@@ -672,6 +765,10 @@
     function collectMetadataValues() {
       const item = store.evidence.find(entry => entry.id === store.editingEvidenceId);
       if (!item) return null;
+      if (Array.from(reusedSources.values()).some(id => !reusableEvidence().some(source => source.id === id))) {
+        lotUi.showToast("A origem de um campo reaproveitado não está mais qualificada ou disponível. Revise ou preencha esse campo antes de gravar.", "error");
+        return null;
+      }
       const displayedDateTime = elements.metaDateTime.value.trim();
       const sourceType = selectedSourceType();
       const sourceStatus = elements.metaUnavailabilityReason.value;
@@ -679,15 +776,39 @@
       const values = {
         id: elements.metaId.value.trim(),
         nature: elements.metaNature.value.trim(),
-        responsible: elements.metaResponsible.value.trim(),
+        responsible: validationApi.normalizePersonalName(elements.metaResponsible.value),
         location: elements.metaLocation.value.trim(),
         description: elements.metaDescription.value.trim(),
         unavailabilityReason: sourceStatus,
         unavailability: ""
       };
       const sourceDetailsRequired = sourceStatus === "other";
+      let inputDateTime = "";
+      try {
+        inputDateTime = domain.brazilianDateTimeToInput(displayedDateTime);
+      } catch {
+        // O campo correspondente recebe o aviso de validação abaixo.
+      }
+      const validDateTime = Boolean(inputDateTime)
+        && validationApi.isCollectionDateTimeOnOrBefore(inputDateTime, domain.localDateTime());
+      const fieldChecks = [
+        [elements.metaId, Boolean(values.id) && values.id.length <= 80],
+        [elements.metaNature, Boolean(values.nature) && values.nature.length <= 120],
+        [elements.metaResponsible, validationApi.isValidPersonalName(elements.metaResponsible.value)],
+        [elements.metaDateTime, validDateTime],
+        [elements.metaLocation, Boolean(values.location) && values.location.length <= 240],
+        [elements.metaDescription, Boolean(values.description) && values.description.length <= limits.maxDescriptionLength],
+        [elements.metaSourceTypes[0], Boolean(sourceType) && sourceType in sourceTypeLabels],
+        [elements.metaUnavailabilityReason, Boolean(sourceStatus) && sourceStatus in primarySourceStatusLabels],
+        [elements.metaUnavailability, !sourceDetailsRequired || Boolean(sourceDetails)]
+      ];
+      if (lotUi.validateFields?.(fieldChecks) === false) {
+        lotUi.showToast("Revise os campos indicados na qualificação.", "error");
+        return null;
+      }
       if (!displayedDateTime || !sourceType || !sourceStatus || (sourceDetailsRequired && !sourceDetails)
-        || [values.id, values.nature, values.responsible, values.location, values.description].some(value => !value)) {
+        || [values.id, values.nature, values.responsible, values.location, values.description].some(value => !value)
+        || !validationApi.isValidPersonalName(elements.metaResponsible.value) || !validDateTime) {
         lotUi.showToast("Todos os campos da qualificação são obrigatórios.", "error");
         return null;
       }
@@ -699,7 +820,7 @@
         return null;
       }
       try {
-        values.inputDateTime = domain.brazilianDateTimeToInput(displayedDateTime);
+        values.inputDateTime = inputDateTime;
         values.dateTime = domain.inputDateToBrazilian(values.inputDateTime);
         elements.metaDateTimePicker.value = values.inputDateTime;
       } catch (error) {
@@ -787,6 +908,8 @@
       renderEvidence,
       addEvidenceFiles,
       openMetadata,
+      copyMetadataField,
+      discardReuseReference,
       closeMetadata,
       addMetadataPhotos,
       addMetadataDocuments,

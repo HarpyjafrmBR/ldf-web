@@ -114,14 +114,14 @@
 
     <div class="guidance-footer-action">
       <p>Quando os arquivos já estiverem preservados e documentados, o LDF Web pode apoiar o acondicionamento e a transferência.</p>
-      <button class="button primary" type="button" data-guidance-action="create">
-        Ir para fechamento de lote
+      <button class="button primary" type="button" data-guidance-action="home">
+        Voltar ao início
       </button>
     </div>
   `;
 
   root.addEventListener("click", event => {
-    const button = event.target.closest('[data-guidance-action="create"]');
-    if (button) document.querySelector('.tab-button[data-tab="create"]')?.click();
+    const button = event.target.closest('[data-guidance-action="home"]');
+    if (button) document.getElementById("back-home")?.click();
   });
 })();

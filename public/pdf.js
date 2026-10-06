@@ -19,6 +19,11 @@
   const MAX_CHARACTER_SPACING = 0.12;
   const COMFORTABLE_WORD_SPACING = 1.1;
   const JUSTIFICATION_TOLERANCE = 0.25;
+  const VISUAL_PROFILE = "LDF-VISUAL-2";
+  const WATERMARK_GRAY = "0.9475";
+  const WATERMARK_COLUMNS = [-75, 110, 295, 480, 665];
+  const WATERMARK_ROWS = [-70, 120, 310, 500, 690, 880];
+  const OFFICIAL_SITE = "https://lacredigitalforense.seg.br/";
 
   const COLORS = {
     navy: "0.055 0.094 0.160",
@@ -28,6 +33,11 @@
     white: "1 1 1",
     green: "0.055 0.430 0.310"
   };
+  const TONES = Object.freeze({
+    primary: Object.freeze({ fill: "0.935 0.960 0.985", stripe: "0.105 0.365 0.665", heading: COLORS.blue }),
+    evidence: Object.freeze({ fill: "0.946 0.972 0.969", stripe: "0.125 0.415 0.420", heading: "0.125 0.415 0.420" }),
+    supplement: Object.freeze({ fill: "0.967 0.969 0.975", stripe: "0.355 0.405 0.495", heading: COLORS.muted })
+  });
 
   window.LDFPdf = { initialDeclaration, auditDeclaration, shippingReceipt, operationTrail };
 
@@ -41,7 +51,8 @@
     ]);
     addHashPanel(items, "SHA-256 DO CONJUNTO QUALIFICADO", data.qualifiedLotHash, {
       size: 7.2,
-      after: 7
+      after: 7,
+      tone: "primary"
     });
     addRegistrationTemporalSummary(items, data.temporalSummary, data.issuedAt);
     addSecurityProtocol(items);
@@ -56,23 +67,38 @@
       const evidenceTitle = `MÍDIA VESTÍGIO #${index + 1}: ${item.name}`;
       addSection(items, evidenceTitle);
       addHashPanel(items, "Hash SHA-256 do arquivo", item.hash);
+      addQualificationHeading(items, "IDENTIFICAÇÃO DO VESTÍGIO");
       addLabelValue(items, "Identificação", item.metadata.id, { indent: 8 });
-      addLabelValue(items, "Natureza", item.metadata.nature, { indent: 8 });
+      addLabelValue(items, "Tipo/descrição do vestígio", item.metadata.nature, { indent: 8 });
+      addQualificationHeading(items, "DADOS DA COLETA");
       addLabelValue(items, "Responsável pela coleta", item.metadata.responsible, { indent: 8 });
       addLabelValue(items, "Data e hora da coleta informadas pelo declarante", item.metadata.dateTime, { indent: 8 });
-      addLabelValue(items, "Localização", item.metadata.location, { indent: 8, after: 3 });
-      addLabelValue(items, "Descrição detalhada", item.metadata.description, {
+      addLabelValue(items, "Local físico ou ambiente virtual", item.metadata.location, { indent: 8, after: 3 });
+      addQualificationHeading(items, "PROCEDIMENTO DE COLETA");
+      const sourceInformation = parseSourceInformationForPdf(item.metadata.unavailability);
+      if (sourceInformation) {
+        addLabelValue(items, "Origem/forma de obtenção do arquivo", sourceInformation.sourceType, { indent: 8 });
+        addLabelValue(items, "Situação do equipamento ou da fonte primária", sourceInformation.status, { indent: 8 });
+        if (sourceInformation.details) {
+          addLabelValue(items, "Informações complementares sobre a fonte", sourceInformation.details, {
+            indent: 8, stacked: true, justify: true, after: 3
+          });
+        }
+      } else {
+        addLabelValue(items, "Origem e situação da fonte", item.metadata.unavailability, {
+          indent: 8, stacked: true, justify: true, after: 3
+        });
+      }
+      addLabelValue(items, "DESCRIÇÃO DETALHADA DO PROCEDIMENTO", item.metadata.description, {
         indent: 8,
         stacked: true,
         justify: true,
         after: 5
       });
-      addLabelValue(items, "Origem e situação da fonte", item.metadata.unavailability, {
-        indent: 8,
-        stacked: true,
-        justify: true,
-        after: 7
-      });
+      const attachmentsStart = items.length + 1;
+      if (item.metadata.photos?.length || item.metadata.documents?.length) {
+      addQualificationHeading(items, "ANEXOS COMPLEMENTARES", "supplement");
+      }
       if (item.metadata.photos?.length) {
         addText(items, "FOTOS COMPLEMENTARES PRESERVADAS NO LOTE", {
           size: 7.8,
@@ -82,7 +108,7 @@
           leading: 11,
           keepWithNext: true
         });
-        item.metadata.photos.forEach(photo => {
+        item.metadata.photos.forEach((photo, photoIndex) => {
           addText(items, photo.name, {
             size: 8.2,
             font: "F2",
@@ -93,11 +119,14 @@
           addHashPanel(items, "SHA-256 da foto complementar", photo.hash, {
             indent: 8,
             size: 6.9,
-            after: 4
+            after: 4,
+            tone: "supplement"
           });
+          if (photoIndex === 0) keepTogether(items, attachmentsStart);
         });
       }
       if (item.metadata.documents?.length) {
+        const documentsStart = items.length;
         addText(items, "DOCUMENTOS COMPLEMENTARES PRESERVADOS NO LOTE", {
           size: 7.8,
           font: "F2",
@@ -106,7 +135,7 @@
           leading: 11,
           keepWithNext: true
         });
-        item.metadata.documents.forEach(document => {
+        item.metadata.documents.forEach((document, documentIndex) => {
           addText(items, document.name, {
             size: 8.2,
             font: "F2",
@@ -117,8 +146,10 @@
           addHashPanel(items, "SHA-256 do documento complementar", document.hash, {
             indent: 8,
             size: 6.9,
-            after: 4
+            after: 4,
+            tone: "supplement"
           });
+          if (documentIndex === 0) keepTogether(items, item.metadata.photos?.length ? documentsStart : attachmentsStart);
         });
       }
       markContinuation(
@@ -130,7 +161,7 @@
     });
 
     const responsibilityStart = items.length;
-    addSection(items, "DECLARAÇÃO DE RESPONSABILIDADE");
+    addSection(items, "DECLARAÇÃO DE RESPONSABILIDADE", "primary");
     addParagraph(
       items,
       "Declaro que conferi integralmente as informações apresentadas e que elas são verdadeiras, exatas e correspondem aos vestígios qualificados. Comprometo-me com a guarda adequada das mídias até a transferência formal, reconhecendo que o LDF Web não substitui controles externos de custódia e armazenamento.",
@@ -148,7 +179,8 @@
       `Declaração de Registro - ${data.lotCode}`,
       data.documentId,
       `Declaração de registro | Lote: ${data.lotCode}`,
-      items
+      items,
+      { qualifiedLotHash: data.qualifiedLotHash }
     );
   }
 
@@ -193,7 +225,7 @@
           photo.expectedHash,
           photo.actualHash,
           photo.status,
-          { indent: 8, after: 5 }
+          { indent: 8, after: 5, tone: "supplement" }
         );
       });
       (item.documents ?? []).forEach(document => {
@@ -210,7 +242,7 @@
           document.expectedHash,
           document.actualHash,
           document.status,
-          { indent: 8, after: 5 }
+          { indent: 8, after: 5, tone: "supplement" }
         );
       });
       markContinuation(
@@ -222,7 +254,7 @@
     });
 
     const responsibilityStart = items.length;
-    addSection(items, "DECLARAÇÃO DE RESPONSABILIDADE");
+    addSection(items, "DECLARAÇÃO DE RESPONSABILIDADE", "primary");
     addParagraph(
       items,
       "Declaro que conferi os resultados da abertura e que os hashes SHA-256 recalculados para os vestígios extraídos e seus arquivos complementares coincidiram com os valores registrados no momento do lacre. A partir deste recebimento, assumo a responsabilidade pela guarda, preservação e destinação adequada dos arquivos, reconhecendo que o LDF Web não substitui os controles externos de custódia e armazenamento.",
@@ -240,7 +272,8 @@
       `Declaração de Recebimento - ${data.lotCode}`,
       data.documentId,
       `Declaração de Recebimento | Lote: ${data.lotCode}`,
-      items
+      items,
+      { qualifiedLotHash: data.qualifiedLotHash }
     );
   }
 
@@ -278,7 +311,7 @@
       data.documentId,
       `Trilha da operação | Lote: ${data.lotCode || "Não informado"}`,
       items,
-      { footerNotice: "none" }
+      { footerNotice: "none", visualKind: "trail" }
     );
   }
 
@@ -287,13 +320,10 @@
     addTitle(items, "RECIBO DE REMESSA DO CONTÊINER LDF");
     addMetaPanel(items, [
       { label: "Identificação do lote", value: data.lotCode },
-      { label: "Arquivo remetido", value: data.fileName },
-      {
-        label: "SHA-256 do arquivo .LDF",
-        value: data.containerHash,
-        fullWidth: true,
-        size: 7.2
-      },
+      { label: "Arquivo remetido", value: data.fileName }
+    ], 7);
+    addHashPanel(items, "SHA-256 do arquivo .LDF", data.containerHash, { tone: "evidence", after: 7 });
+    addMetaPanel(items, [
       {
         label: "Confirmação da gravação",
         value: data.persistenceConfirmation === "manual"
@@ -301,14 +331,14 @@
           : "Confirmada automaticamente pela API de gravação do navegador",
         fullWidth: true
       }
-    ]);
+    ], 13, "supplement");
 
     return buildPdf(
       `Recibo de Remessa - ${data.lotCode}`,
       data.documentId,
       `Recibo de remessa | Lote: ${data.lotCode}`,
       items,
-      { footerNotice: "none" }
+      { footerNotice: "none", qualifiedLotHash: data.qualifiedLotHash }
     );
   }
 
@@ -316,7 +346,22 @@
     if (height > 0) items.push({ type: "space", height });
   }
 
+  function addQualificationHeading(items, title, tone = "evidence") {
+    addSpace(items, 6);
+    addText(items, title, {
+      size: 8.2, font: "F2", color: TONES[tone].heading, indent: 8,
+      leading: 12, after: 3, keepWithNext: true
+    });
+  }
+
+  function parseSourceInformationForPdf(value) {
+    const match = /^Forma de obtenção: ([^\n]+)\.\nSituação da fonte primária: ([^\n]+)\.(?:\nInformações complementares: ([\s\S]+))?$/.exec(String(value ?? ""));
+    if (!match || !match[1].trim() || !match[2].trim()) return null;
+    return { sourceType: match[1], status: match[2], details: match[3]?.trim() ?? "" };
+  }
+
   function addText(items, text, options = {}) {
+    pdfText(text, options.fieldLabel ?? "texto do documento");
     const size = options.size ?? 9.4;
     const font = options.font ?? (options.bold ? "F2" : "F1");
     const indent = options.indent ?? 0;
@@ -372,7 +417,8 @@
     });
   }
 
-  function createSectionItem(title) {
+  function createSectionItem(title, tone = "evidence") {
+    pdfText(title, "título ou nome do vestígio");
     const lines = wrapText(title, {
       size: 10.1,
       font: "F2",
@@ -380,17 +426,18 @@
     });
     return {
       type: "section",
+      tone,
       lines,
       height: 13 + lines.length * 12,
       keepWithNext: true
     };
   }
 
-  function addSection(items, title) {
-    items.push(createSectionItem(title));
+  function addSection(items, title, tone = "evidence") {
+    items.push(createSectionItem(title, tone));
   }
 
-  function addMetaPanel(items, rows, after = 13) {
+  function addMetaPanel(items, rows, after = 13, tone = "primary") {
     const innerWidth = BODY_WIDTH - 24;
     const regularRows = rows.filter(row => !row.fullWidth);
     const widestLabel = Math.max(0, ...regularRows.map(row => (
@@ -399,6 +446,7 @@
     const labelWidth = Math.min(170, Math.max(110, widestLabel + 14));
     const valueWidth = innerWidth - labelWidth;
     const preparedRows = rows.map(row => {
+      pdfText(row.value, row.label);
       const size = row.size ?? 8.7;
       return {
         label: row.label,
@@ -416,6 +464,7 @@
     ), 0);
     items.push({
       type: "metaPanel",
+      tone,
       rows: preparedRows,
       labelWidth,
       height: 18 + lineCount * 11.8
@@ -424,6 +473,7 @@
   }
 
   function addLabelValue(items, label, value, options = {}) {
+    pdfText(value, label);
     const indent = options.indent ?? 0;
     if (options.stacked) {
       addText(items, label.toUpperCase(), {
@@ -492,6 +542,7 @@
     });
     items.push({
       type: "hashPanel",
+      tone: options.tone ?? "evidence",
       label,
       hashLines,
       indent,
@@ -607,6 +658,7 @@
   function addComparisonPanel(items, expectedHash, actualHash, status, options = {}) {
     items.push({
       type: "comparisonPanel",
+      tone: options.tone ?? "evidence",
       expectedHash,
       actualHash,
       status,
@@ -782,8 +834,9 @@
 
   function drawSectionItem(commands, item) {
     const y = item.top - item.height + 3;
-    commands.push(`q 0.945 0.968 0.992 rg ${BODY_LEFT} ${number(y)} ${BODY_WIDTH} ${item.height - 5} re f Q`);
-    commands.push(`q 0.105 0.365 0.665 rg ${BODY_LEFT} ${number(y)} 3 ${item.height - 5} re f Q`);
+    const tone = TONES[item.tone];
+    commands.push(`q ${tone.fill} rg ${BODY_LEFT} ${number(y)} ${BODY_WIDTH} ${item.height - 5} re f Q`);
+    commands.push(`q ${tone.stripe} rg ${BODY_LEFT} ${number(y)} 1.5 ${item.height - 5} re f Q`);
     let baseline = item.top - 15.5;
     item.lines.forEach(line => {
       commands.push(textCommand(line.text, {
@@ -795,8 +848,9 @@
 
   function drawMetaPanelItem(commands, item) {
     const y = item.top - item.height;
-    commands.push(`q 0.965 0.974 0.984 rg ${BODY_LEFT} ${number(y)} ${BODY_WIDTH} ${item.height} re f Q`);
-    commands.push(`q 0.105 0.365 0.665 rg ${BODY_LEFT} ${number(y)} 3 ${item.height} re f Q`);
+    const tone = TONES[item.tone];
+    commands.push(`q ${tone.fill} rg ${BODY_LEFT} ${number(y)} ${BODY_WIDTH} ${item.height} re f Q`);
+    commands.push(`q ${tone.stripe} rg ${BODY_LEFT} ${number(y)} 1.5 ${item.height} re f Q`);
     let baseline = item.top - 14;
     item.rows.forEach(row => {
       if (row.fullWidth) {
@@ -837,8 +891,9 @@
   function drawHashPanelItem(commands, item) {
     const x = BODY_LEFT + item.indent;
     const y = item.top - item.height;
-    commands.push(`q 0.967 0.975 0.983 rg ${number(x)} ${number(y)} ${number(item.width)} ${item.height} re f Q`);
-    commands.push(`q 0.105 0.365 0.665 rg ${number(x)} ${number(y)} 3 ${item.height} re f Q`);
+    const tone = TONES[item.tone];
+    commands.push(`q ${tone.fill} rg ${number(x)} ${number(y)} ${number(item.width)} ${item.height} re f Q`);
+    commands.push(`q ${tone.stripe} rg ${number(x)} ${number(y)} 1.5 ${item.height} re f Q`);
     commands.push(textCommand(item.label.toUpperCase(), {
       font: "F2", size: 7.2, x: x + 12, y: item.top - 11, color: COLORS.muted
     }));
@@ -855,7 +910,9 @@
     const x = BODY_LEFT + item.indent;
     const width = BODY_WIDTH - item.indent;
     const y = item.top - item.height;
-    commands.push(`q 0.967 0.975 0.983 rg ${number(x)} ${number(y)} ${number(width)} ${item.height} re f Q`);
+    const tone = TONES[item.tone];
+    commands.push(`q ${tone.fill} rg ${number(x)} ${number(y)} ${number(width)} ${item.height} re f Q`);
+    commands.push(`q ${tone.stripe} rg ${number(x)} ${number(y)} 1.5 ${item.height} re f Q`);
     commands.push(textCommand("HASH REGISTRADO", {
       font: "F2", size: 6.9, x: x + 12, y: item.top - 13, color: COLORS.muted
     }));
@@ -909,41 +966,103 @@
     pageItemRenderers[item.type]?.(commands, item);
   }
 
-  function rotatedWatermarkCommand(text, size, centerX, centerY) {
-    const diagonal = Math.SQRT1_2;
-    const width = measureText(text, size, "F2");
-    const x = centerX - diagonal * width / 2;
-    const y = centerY - diagonal * width / 2;
-    return `q 0.965 g BT /F2 ${size} Tf ${number(diagonal)} ${number(diagonal)} -${number(diagonal)} ${number(diagonal)} ${number(x)} ${number(y)} Tm (${pdfText(text)}) Tj ET Q`;
+  function sha256Bytes(text) {
+    if (typeof window.LDFSha256 !== "function") {
+      throw new Error("O gerador da marca documental está indisponível.");
+    }
+    const hasher = new window.LDFSha256();
+    hasher.update(new TextEncoder().encode(text));
+    return hasher.digest();
+  }
+
+  function hexBytes(bytes) {
+    return Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("");
+  }
+
+  function visualSeed(documentId, options) {
+    if (typeof documentId !== "string" || !documentId || documentId.length > 80) {
+      throw new Error("O identificador documental da marca é inválido.");
+    }
+    const parts = [VISUAL_PROFILE];
+    if (options.visualKind !== "trail") {
+      if (typeof options.qualifiedLotHash !== "string"
+        || !/^[a-f0-9]{64}$/i.test(options.qualifiedLotHash)) {
+        throw new Error("O hash qualificado necessário à marca documental está ausente ou inválido.");
+      }
+      parts.push(options.qualifiedLotHash.toLowerCase());
+    }
+    parts.push(documentId);
+    return hexBytes(sha256Bytes(JSON.stringify(parts)));
+  }
+
+  function watermarkParameters(seed, pageNumber, totalPages, blockIndex) {
+    const digest = sha256Bytes(JSON.stringify(["page", seed, pageNumber, totalPages, blockIndex]));
+    const view = new DataView(digest.buffer, digest.byteOffset, digest.byteLength);
+    const unit = index => view.getUint32(index * 4, false) / 0x100000000;
+    return {
+      offsetX: (unit(0) - 0.5) * 10,
+      offsetY: (unit(1) - 0.5) * 10,
+      angle: Math.PI / 4,
+      spacing: (unit(3) - 0.5) * 0.20
+    };
+  }
+
+  function rotatedWatermarkCommand(text, size, centerX, centerY, params, font = "F2") {
+    const cosine = Math.cos(params.angle);
+    const sine = Math.sin(params.angle);
+    const width = measureText(text, size, font) + params.spacing * (text.length - 1);
+    const x = centerX - cosine * width / 2;
+    const y = centerY - sine * width / 2;
+    return `q ${WATERMARK_GRAY} g BT /${font} ${size} Tf ${spacingNumber(params.spacing)} Tc ${spacingNumber(cosine)} ${spacingNumber(sine)} -${spacingNumber(sine)} ${spacingNumber(cosine)} ${number(x)} ${number(y)} Tm (${pdfText(text)}) Tj ET Q`;
+  }
+
+  function emittingVersion() {
+    const releaseToken = window.LDFRuntimeIdentity?.releaseToken;
+    const match = typeof releaseToken === "string"
+      ? /^(?:[a-z]+-)?(\d+\.\d+\.\d+)$/.exec(releaseToken)
+      : null;
+    if (!match) throw new Error("A versão emissora do PDF está indisponível.");
+    return match[1];
   }
 
   function pageStream(pageItems, context) {
-    const { header, documentId, pageNumber, totalPages, footerNotice } = context;
+    const { header, documentId, pageNumber, totalPages, footerNotice, seed, version } = context;
     const pageLabel = `${pageNumber}/${totalPages}`;
     const idLine = `Documento gerado localmente pelo LDF Web | ID: ${documentId}`;
-    const watermarkOffset = 22;
-    const commands = [
+    const watermarkId = `${documentId} | Página ${pageLabel}`;
+    const commands = WATERMARK_ROWS.flatMap((centerY, rowIndex) => (
+      WATERMARK_COLUMNS.flatMap((centerX, columnIndex) => {
+        const params = watermarkParameters(
+          seed, pageNumber, totalPages, rowIndex * WATERMARK_COLUMNS.length + columnIndex
+        );
+        const x = centerX + params.offsetX;
+        const y = centerY + params.offsetY;
+        return [
+          rotatedWatermarkCommand("LDF WEB - LACRE DIGITAL FORENSE", 13, x, y + 9, params),
+          rotatedWatermarkCommand(watermarkId, 7, x, y - 9, params, "F1")
+        ];
+      })
+    ));
+    commands.push(
       `q ${COLORS.navy} rg 0 790 ${PAGE_WIDTH} 52 re f Q`,
       textCommand("LDF - LACRE DIGITAL FORENSE", {
-        font: "F2", size: 13, x: BODY_LEFT, y: 812, color: COLORS.white
+        font: "F2", size: 12, x: BODY_LEFT, y: 812, color: COLORS.white
+      }),
+      textCommand(`LDF Web · v${version}`, {
+        font: "F2", size: 8.2,
+        x: rightAlignedX(`LDF Web · v${version}`, 8.2, "F2", PAGE_WIDTH - BODY_RIGHT),
+        y: 815, color: COLORS.white
       }),
       textCommand(header, {
-        font: "F1", size: 8, x: BODY_LEFT, y: 798, color: "0.82 0.87 0.93"
+        font: "F1", size: 7.5, x: BODY_LEFT, y: 798, color: "0.82 0.87 0.93"
       }),
-      rotatedWatermarkCommand(
-        "LACRE DIGITAL",
-        38,
-        PAGE_WIDTH / 2 - Math.SQRT1_2 * watermarkOffset,
-        PAGE_HEIGHT / 2 + Math.SQRT1_2 * watermarkOffset
-      ),
-      rotatedWatermarkCommand(
-        "FORENSE",
-        38,
-        PAGE_WIDTH / 2 + Math.SQRT1_2 * watermarkOffset,
-        PAGE_HEIGHT / 2 - Math.SQRT1_2 * watermarkOffset
-      ),
+      textCommand("lacredigitalforense.seg.br", {
+        font: "F1", size: 7.5,
+        x: rightAlignedX("lacredigitalforense.seg.br", 7.5, "F1", PAGE_WIDTH - BODY_RIGHT),
+        y: 798, color: COLORS.white
+      }),
       `q 0.35 0.42 0.50 RG 0.8 w ${BODY_LEFT} 50 m ${PAGE_WIDTH - BODY_RIGHT} 50 l S Q`
-    ];
+    );
 
     if (footerNotice === "validation") {
       commands.push(
@@ -979,6 +1098,8 @@
    */
   function buildPdf(title, documentId, header, items, options = {}) {
     const pages = paginate(items);
+    const seed = visualSeed(documentId, options);
+    const version = emittingVersion();
     const objects = [];
     const pageObjectIds = [];
 
@@ -992,16 +1113,22 @@
     pages.forEach((page, index) => {
       const pageId = nextId++;
       const contentId = nextId++;
+      const siteLinkId = nextId++;
       pageObjectIds.push(pageId);
       const stream = pageStream(page, {
         header,
         documentId,
+        version,
+        seed,
         pageNumber: index + 1,
         totalPages: pages.length,
         footerNotice: options.footerNotice ?? "validation"
       });
       objects[contentId] = `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`;
-      objects[pageId] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_WIDTH} ${PAGE_HEIGHT}] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R /F4 6 0 R >> >> /Contents ${contentId} 0 R >>`;
+      const siteLabel = "lacredigitalforense.seg.br";
+      const siteX = rightAlignedX(siteLabel, 7.5, "F1", PAGE_WIDTH - BODY_RIGHT);
+      objects[siteLinkId] = `<< /Type /Annot /Subtype /Link /Rect [${number(siteX)} 795 ${number(PAGE_WIDTH - BODY_RIGHT)} 808] /Border [0 0 0] /A << /S /URI /URI (${OFFICIAL_SITE}) >> >>`;
+      objects[pageId] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_WIDTH} ${PAGE_HEIGHT}] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R /F4 6 0 R >> >> /Contents ${contentId} 0 R /Annots [${siteLinkId} 0 R] >>`;
     });
 
     objects[2] = `<< /Type /Pages /Count ${pages.length} /Kids [${pageObjectIds.map(id => `${id} 0 R`).join(" ")}] >>`;
@@ -1102,25 +1229,26 @@
       + characterGaps * characterSpacing;
   }
 
-  function pdfText(value) {
-    const substitutions = {
-      "–": "-", "—": "-", "“": "\"", "”": "\"", "‘": "'", "’": "'",
-      "•": "-", "…": "..."
+  function pdfText(value, field = "texto do documento") {
+    const winAnsiCodes = {
+      "€": 0x80, "‚": 0x82, "ƒ": 0x83, "„": 0x84, "…": 0x85,
+      "†": 0x86, "‡": 0x87, "ˆ": 0x88, "‰": 0x89, "Š": 0x8a,
+      "‹": 0x8b, "Œ": 0x8c, "Ž": 0x8e, "‘": 0x91, "’": 0x92,
+      "“": 0x93, "”": 0x94, "•": 0x95, "–": 0x96, "—": 0x97,
+      "˜": 0x98, "™": 0x99, "š": 0x9a, "›": 0x9b, "œ": 0x9c,
+      "ž": 0x9e, "Ÿ": 0x9f
     };
     let output = "";
-    for (const originalCharacter of String(value ?? "")) {
-      const character = substitutions[originalCharacter] ?? originalCharacter;
-      for (const unit of character) {
-        const code = unit.codePointAt(0);
-        if (unit === "\\" || unit === "(" || unit === ")") {
-          output += `\\${unit}`;
-        } else if (code >= 32 && code <= 126) {
-          output += unit;
-        } else if (code <= 255) {
-          output += `\\${code.toString(8).padStart(3, "0")}`;
-        } else {
-          output += "?";
-        }
+    for (const originalCharacter of String(value ?? "").replace(/\s+/gu, " ")) {
+      const code = winAnsiCodes[originalCharacter] ?? originalCharacter.codePointAt(0);
+      if (originalCharacter === "\\" || originalCharacter === "(" || originalCharacter === ")") {
+        output += `\\${originalCharacter}`;
+      } else if (code >= 32 && code <= 126) {
+        output += originalCharacter;
+      } else if (code >= 160 && code <= 255 || winAnsiCodes[originalCharacter]) {
+        output += `\\${code.toString(8).padStart(3, "0")}`;
+      } else {
+        throw new Error(`O PDF não pode representar fielmente o campo ${field} (U+${code.toString(16).toUpperCase()}). Revise o valor antes de emitir o documento.`);
       }
     }
     return output;

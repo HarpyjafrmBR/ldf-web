@@ -1,4 +1,4 @@
 (function () {
   "use strict";
-  window.LDFRuntimeIdentity = Object.freeze({"releaseToken":"beta-1.1.2","buildId":"b3d3d67918f6c1ed1e82dde5577dc10468dfef13ab41e8087a457e41063a296f","cacheName":"ldf-web-beta-1.1.2-b3d3d67918f6c1ed1e82dde5577dc10468dfef13ab41e8087a457e41063a296f","sourceCommit":"a108960a615b87c588c3f1619d6d440eff33e322"});
+  window.LDFRuntimeIdentity = Object.freeze({"releaseToken":"beta-2.0.0","buildId":"ff43c2659ce67641a9a7061c09b51204aa18e00977f1b91b66073ed814350eb1","cacheName":"ldf-web-beta-2.0.0-ff43c2659ce67641a9a7061c09b51204aa18e00977f1b91b66073ed814350eb1","sourceCommit":"2fc3ecbf65528be7073e9486eae22d72c8c4d193"});
 })();
