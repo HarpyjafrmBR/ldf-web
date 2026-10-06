@@ -273,10 +273,10 @@ if ($applicationPackage.SPDXID -cne "SPDXRef-Package-LDF-Web" -or $applicationPa
     $applicationPackage.licenseDeclared -cne "LicenseRef-LDF-Web-1.0" -or $applicationPackage.copyrightText -cne "Copyright 2026 Projeto LDF Web" -or
     $applicationPackage.comment -cne "LicenseRef-LDF-Web-1.0 is provided in LICENSE.md; the application bundles the separately identified MediaInfo runtime dependency.") { throw "SBOM application package is invalid." }
 if ($mediaInfoPackage.SPDXID -cne "SPDXRef-Package-mediainfo-js" -or $mediaInfoPackage.name -cne "mediainfo.js" -or
-    $mediaInfoPackage.versionInfo -cne "0.3.7" -or $mediaInfoPackage.downloadLocation -cne "https://registry.npmjs.org/mediainfo.js/-/mediainfo.js-0.3.7.tgz" -or
+    $mediaInfoPackage.versionInfo -cne "0.3.8" -or $mediaInfoPackage.downloadLocation -cne "https://registry.npmjs.org/mediainfo.js/-/mediainfo.js-0.3.8.tgz" -or
     $mediaInfoPackage.filesAnalyzed -ne $false -or $mediaInfoPackage.licenseConcluded -cne "BSD-2-Clause" -or
     $mediaInfoPackage.licenseDeclared -cne "BSD-2-Clause" -or $mediaInfoPackage.copyrightText -cne "NOASSERTION" -or
-    $mediaInfoPackage.comment -cne "Vendored UMD wrapper with MediaInfoLib 25.10 WebAssembly; license text is MEDIAINFO_LICENSE.txt.") { throw "SBOM MediaInfo package is invalid." }
+    $mediaInfoPackage.comment -cne "Vendored UMD wrapper with MediaInfoLib 26.05 WebAssembly; license text is MEDIAINFO_LICENSE.txt.") { throw "SBOM MediaInfo package is invalid." }
 if ($sbom.relationships -isnot [System.Array] -or @($sbom.relationships).Count -ne 2) { throw "SBOM must contain DESCRIBES and DEPENDS_ON relationships." }
 $describes = $sbom.relationships[0]
 $dependsOn = $sbom.relationships[1]

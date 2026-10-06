@@ -41,7 +41,7 @@
     writable: false
   });
 
-  function createCore({ now, randomUUID }) {
+  function createCore({ now, randomUUID, validateCpf }) {
     const creation = {
       runtimeReady: false,
       evidence: [],
@@ -58,12 +58,15 @@
       temporalAlertKey: "",
       temporalLifecycleEventCount: 0,
       pendingContainer: null,
+      signedSelection: null,
+      selectionRevision: 0,
+      hasShownEvidenceList: false,
       containerSaved: false,
       shippingReceipt: null,
       logs: [],
       logSequence: 0
     };
-    const audit = { downloads: [], auditPdf: null, auditPdfName: "", temporalSession: null };
+    const audit = { downloads: [], auditPdf: null, auditPdfName: "", temporalSession: null, selectedContainer: null, selectionRevision: 0 };
     const routine = { active: false, label: "" };
 
     function attachmentBytes(item, attachmentType) {
@@ -120,6 +123,18 @@
         && !creation.containerSaved;
     }
 
+    function creationStages() {
+      const qualified = creation.evidence.length > 0 && creation.evidence.every(item => Boolean(item.metadata));
+      const issued = creation.locked && Boolean(creation.documentId && creation.qualifiedLotRecord && creation.qualifiedLotHash);
+      const selected = Boolean(creation.signedSelection || creation.pendingContainer || creation.containerSaved);
+      return [
+        { available: creation.runtimeReady, completed: qualified },
+        { available: creation.runtimeReady && qualified, completed: issued },
+        { available: creation.runtimeReady && issued, completed: selected },
+        { available: creation.runtimeReady && issued && selected, completed: creation.containerSaved }
+      ];
+    }
+
     function setCreationLocked(locked) {
       creation.locked = locked;
     }
@@ -168,6 +183,10 @@
       creation.temporalLifecycleEventCount = 0;
       if (creation.pendingContainer) creation.pendingContainer.secret = "";
       creation.pendingContainer = null;
+      creation.signedSelection = null;
+      // Reiniciar também invalida leituras assíncronas da seleção anterior.
+      creation.selectionRevision += 1;
+      creation.hasShownEvidenceList = false;
       creation.containerSaved = false;
       creation.shippingReceipt = null;
       creation.logs = [];
@@ -181,6 +200,8 @@
     }
 
     function clearAudit() {
+      audit.selectionRevision += 1;
+      audit.selectedContainer = null;
       clearAuditDownloads();
       audit.temporalSession = null;
     }
@@ -274,19 +295,7 @@
     }
 
     function isValidCpf(value) {
-      const digits = String(value).replace(/\D/g, "");
-      if (digits.length !== 11 || /^(\d)\1{10}$/.test(digits)) return false;
-      const digit = partial => {
-        let sum = 0;
-        for (let index = 0; index < partial.length; index += 1) {
-          sum += Number(partial[index]) * (partial.length + 1 - index);
-        }
-        const result = (sum * 10) % 11;
-        return result === 10 ? 0 : result;
-      };
-      const first = digit(digits.slice(0, 9));
-      const second = digit(`${digits.slice(0, 9)}${first}`);
-      return digits.endsWith(`${first}${second}`);
+      return validateCpf?.(value) === true;
     }
 
     function localDateTime(date = now()) {
@@ -356,6 +365,7 @@
         isCreationUnavailable,
         hasPendingContainer,
         hasCreationDraft,
+        creationStages,
         isAwaitingSignedDeclaration
       }),
       transitions: Object.freeze({

@@ -11,8 +11,120 @@
     endRoutineTransition,
     createElement,
     schedule,
-    synchronizeCreationControls
+    scrollToStart,
+    synchronizeCreationControls,
+    creationPresentation,
+    creationStages
   }) {
+    let aboutReturnFocus = null;
+    let view = "home";
+    let informationalReturnFocus = null;
+    let visitedCreationStage = 1;
+    const dialogTriggers = new Map();
+
+    function renderCreationStages() {
+      const creationStore = creationPresentation();
+      const stages = creationStages();
+      if (!stages[visitedCreationStage - 1].available && visitedCreationStage !== 1) visitedCreationStage = 1;
+      elements.stageButtons.forEach(button => {
+        const stage = Number(button.dataset.stage);
+        button.disabled = routine.active || !stages[stage - 1].available;
+        button.classList.toggle("done", stages[stage - 1].completed);
+        button.classList.toggle("current", stage === visitedCreationStage);
+        if (stage === visitedCreationStage) button.setAttribute("aria-current", "step");
+        else button.removeAttribute("aria-current");
+        button.setAttribute("aria-label", `${stage}. ${button.textContent.trim()}. ${stages[stage - 1].completed ? "Concluída" : "Pendente"}`);
+      });
+      elements.stagePanels.forEach(panel => { panel.hidden = Number(panel.dataset.stagePanel) !== visitedCreationStage; });
+      elements.nextStageButtons.forEach(button => { button.disabled = routine.active || !stages[Number(button.dataset.nextStage) - 1].available; });
+      if (elements.qualificationStatus) {
+        const pending = creationStore.evidenceCount - creationStore.qualifiedCount;
+        elements.qualificationStatus.textContent = stages[1].completed
+          ? "Declaração emitida. Dados preservados; reinicie para alterar os vestígios."
+          : creationStore.evidenceCount === 0 ? "Adicione arquivos para continuar."
+          : pending ? `${pending} vestígio(s) aguardando qualificação.`
+          : "Todos os vestígios estão qualificados. Revise e prossiga para a declaração.";
+      }
+      elements.firstFile.hidden = creationStore.hasShownEvidenceList;
+      elements.evidencePanel.hidden = !creationStore.hasShownEvidenceList;
+      elements.addFirstFile.disabled = routine.active || creationStore.locked || !creationStore.runtimeReady;
+      elements.emitDocument.disabled = routine.active || !stages[1].available || stages[1].completed || creationStore.locked;
+      elements.generateDeclaration.disabled = elements.emitDocument.disabled;
+      elements.declarationStatus.textContent = stages[1].completed ? `Declaração emitida: ${creationStore.documentId}` : `${creationStore.qualifiedCount} vestígio(s) qualificado(s).`;
+      const selected = creationStore.signedSelection;
+      elements.signedSelection.hidden = !selected;
+      elements.signedChecks.hidden = !selected;
+      elements.signedName.textContent = selected?.name || "";
+      elements.signedHash.textContent = selected ? `SHA-256 ${selected.sha256}` : "";
+      elements.signedCheckResults.textContent = selected ? `PDF dentro do limite e envelope conferido. Texto do identificador: ${selected.inspection.textMatches[0] ? "localizado" : "não localizado"}; SHA-256 qualificado: ${selected.inspection.textMatches[1] ? "localizado" : "não localizado"}; marcadores aparentes de assinatura: ${selected.inspection.signatureMarkersDetected ? "localizados" : "não localizados"}.` : "";
+      elements.sealCount.textContent = String(creationStore.evidenceCount);
+      elements.sealDocument.textContent = selected?.name || "Nenhum documento selecionado";
+      elements.beginSealing.hidden = Boolean(creationStore.planPending || creationStore.containerSaved);
+      elements.beginSealing.disabled = routine.active || !stages[3].available;
+      elements.closingStatus.textContent = creationStore.containerSaved ? "Persistência do contêiner confirmada." : creationStore.downloadRequested ? "Download solicitado. Aguardando confirmação manual de conclusão." : creationStore.planPending ? "Plano preparado. Aguardando salvamento do contêiner." : "Defina a chave na janela final para preparar o fechamento.";
+      elements.homeDraft.hidden = !creationStore.evidenceCount;
+    }
+
+    function visitCreationStage(stage, focus = true) {
+      if (routine.active || !creationStages()[stage - 1]?.available) return false;
+      visitedCreationStage = stage;
+      renderCreationStages();
+      if (focus) elements.stagePanels[stage - 1].querySelector("h2").focus({ preventScroll: true });
+      return true;
+    }
+
+    function resetNavigation() { visitedCreationStage = 1; renderCreationStages(); }
+    function openCreationDialog(dialog, trigger, firstField, secret = false) {
+      const creationStore = creationPresentation();
+      if (routine.active) return false;
+      if (secret && (!creationStages()[3].available || creationStore.planPending || creationStore.containerSaved)) return false;
+      if (!secret && (!creationStages()[1].available || creationStore.locked)) return false;
+      if (secret) clearCreationSecret();
+      dialogTriggers.set(dialog, trigger);
+      dialog.showModal();
+      firstField.focus({ preventScroll: true });
+      return true;
+    }
+    function clearCreationSecret() { elements.creationSecretInputs.forEach(input => { input.value = ""; input.type = "password"; }); }
+    function returnFromCreationDialog(dialog, secret = false) {
+      if (secret) clearCreationSecret();
+      const trigger = dialogTriggers.get(dialog);
+      dialogTriggers.delete(dialog);
+      if (trigger?.isConnected && !trigger.hidden) trigger.focus({ preventScroll: true });
+    }
+
+    function openAbout(trigger) {
+      if (routine.active || view === "about") return;
+      aboutReturnFocus = trigger;
+      if (!elements.aboutContent.childElementCount) {
+        const fragment = elements.aboutTemplate.content.cloneNode(true);
+        const ids = new Set(Array.from(fragment.querySelectorAll("[id]"), node => node.id));
+        for (const node of fragment.querySelectorAll("[id]")) node.id = `session-about-${node.id}`;
+        for (const node of fragment.querySelectorAll("[aria-labelledby], [aria-describedby], a[href^='#']")) {
+          for (const attribute of ["aria-labelledby", "aria-describedby"]) {
+            if (node.hasAttribute(attribute)) node.setAttribute(attribute, node.getAttribute(attribute).split(/\s+/).map(id => ids.has(id) ? `session-about-${id}` : id).join(" "));
+          }
+          const href = node.getAttribute("href");
+          if (href?.startsWith("#") && ids.has(href.slice(1))) node.setAttribute("href", `#session-about-${href.slice(1)}`);
+        }
+        for (const anchor of fragment.querySelectorAll('a[href="index.html"]')) {
+          anchor.removeAttribute("data-page-transition");
+          anchor.setAttribute("href", "#home-panel");
+          anchor.dataset.closeAbout = "true";
+        }
+        elements.aboutContent.append(fragment);
+      }
+      switchTab("about");
+    }
+
+    function closeAbout() {
+      switchTab("home");
+    }
+
+    function returnFromAbout() {
+      if (aboutReturnFocus?.isConnected) aboutReturnFocus.focus({ preventScroll: true });
+      aboutReturnFocus = null;
+    }
     function escapeHtml(value) {
       return String(value ?? "")
         .replaceAll("&", "&amp;")
@@ -166,15 +278,31 @@
     }
 
     function switchTab(tabName) {
-      elements.privacyStrip.classList.toggle("hidden", tabName === "guidance");
+      if (routine.active || !["home", "create", "audit", "guidance", "about"].includes(tabName)) return false;
+      const previousView = view;
+      if (tabName === "guidance") informationalReturnFocus = elements.tabButtons.find(button => button.dataset.tab === "guidance");
+      view = tabName;
+      elements.body.dataset.view = tabName;
+      elements.privacyStrip.classList.toggle("hidden", ["guidance", "about"].includes(tabName));
+      if (tabName === "home") elements.environmentHome.prepend(elements.privacyStrip);
+      else elements.aboutPanel.parentElement.insertBefore(elements.privacyStrip, elements.tabPanels[0]);
+      elements.backHome.hidden = tabName === "home";
       elements.tabButtons.forEach(button => {
         const active = button.dataset.tab === tabName;
         button.classList.toggle("active", active);
         button.setAttribute("aria-selected", String(active));
       });
       elements.tabPanels.forEach(panel => {
-        panel.classList.toggle("active", panel.id === `${tabName}-panel`);
+        const active = panel.id === `${tabName}-panel`;
+        panel.classList.toggle("active", active);
+        panel.hidden = !active;
+        if (active) panel.querySelector("h1")?.focus({ preventScroll: true });
       });
+      renderCreationStages();
+      scrollToStart();
+      if (tabName === "home" && previousView === "about") returnFromAbout();
+      if (tabName === "home" && previousView === "guidance") informationalReturnFocus?.focus({ preventScroll: true });
+      return true;
     }
 
     function maskSecretInputs() {
@@ -192,7 +320,10 @@
       enableSignedDeclarationControls,
       lockPreparedContainerControls,
       switchTab,
-      maskSecretInputs
+      maskSecretInputs,
+      openAbout,
+      closeAbout,
+      returnFromAbout, renderCreationStages, visitCreationStage, resetNavigation, openCreationDialog, returnFromCreationDialog, clearCreationSecret
     });
   }
 

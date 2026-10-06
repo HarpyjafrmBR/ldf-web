@@ -31,7 +31,7 @@
   const RUNTIME_IDENTITY = window.LDFRuntimeIdentity;
   const operationCoordination = window.LDFOperationCoordination;
   if (!RUNTIME_IDENTITY
-    || RUNTIME_IDENTITY.releaseToken !== "beta-1.1.2"
+    || RUNTIME_IDENTITY.releaseToken !== "beta-2.0.0"
     || !/^[0-9a-f]{64}$/.test(RUNTIME_IDENTITY.buildId)
     || !(RUNTIME_IDENTITY.sourceCommit === null || /^[0-9a-f]{40}$/.test(RUNTIME_IDENTITY.sourceCommit))
     || RUNTIME_IDENTITY.cacheName !== `ldf-web-${RUNTIME_IDENTITY.releaseToken}-${RUNTIME_IDENTITY.buildId}`) {
@@ -62,7 +62,8 @@
 
   const core = createCore({
     now: () => new Date(),
-    randomUUID: () => crypto.randomUUID()
+    randomUUID: () => crypto.randomUUID(),
+    validateCpf: value => window.LDFValidation.isValidCpf(value)
   });
   const { creation: state, audit: auditState, routine: routineState } = core.stores;
   const {
@@ -102,6 +103,87 @@
   } = core.domain;
 
   const byId = id => document.getElementById(id);
+  function fieldErrorMessage(element) {
+    if (element.name === "meta-source-type") return "Selecione a forma de obtenção do vestígio.";
+    switch (element.id) {
+      case "lot-code": return "Use de 1 a 60 letras, números, hífens ou sublinhados na identificação do lote.";
+      case "operator-name": return "Informe o nome do operador com até 120 caracteres, usando letras, espaços, hífens ou apóstrofos.";
+      case "receiver-name": return "Informe o nome do recebedor com até 120 caracteres, usando letras, espaços, hífens ou apóstrofos.";
+      case "meta-responsible": return "Informe o nome do responsável pela coleta com até 120 caracteres, usando letras, espaços, hífens ou apóstrofos.";
+      case "operator-cpf":
+      case "receiver-cpf": return "Informe um CPF válido com 11 dígitos.";
+      case "lot-secret":
+      case "audit-secret": return "Informe uma chave de acesso entre 12 e 256 caracteres.";
+      case "lot-secret-confirm": return "Repita exatamente a chave de acesso informada.";
+      case "meta-datetime": {
+        if (!element.value.trim() || element.validity.patternMismatch) return "Informe a data e hora no formato DD/MM/AAAA HH:mm:ss.";
+        try {
+          const date = brazilianDateTimeToInput(element.value.trim());
+          if (!window.LDFValidation.isCollectionDateTimeOnOrBefore(date, localDateTime())) return "A data e hora da coleta não podem estar no futuro.";
+        } catch { return "Informe uma data e hora válidas no formato DD/MM/AAAA HH:mm:ss."; }
+        return "Informe uma data e hora válidas no formato DD/MM/AAAA HH:mm:ss.";
+      }
+      case "meta-id": return "Informe o código de rastreamento do vestígio com até 80 caracteres.";
+      case "meta-nature": return "Informe o tipo ou a descrição do vestígio com até 120 caracteres.";
+      case "meta-location": return "Informe o local da coleta com até 240 caracteres.";
+      case "meta-description": return "Descreva o procedimento de coleta com até 4000 caracteres.";
+      case "meta-unavailability-reason": return "Selecione a situação do equipamento ou da fonte primária.";
+      case "meta-unavailability": return "Ao selecionar Outro, descreva a situação da fonte primária com até 1600 caracteres.";
+      default: return "Preencha este campo com uma informação válida.";
+    }
+  }
+  function setFieldValidity(element, valid) {
+    if (!element) return valid;
+    const field = element.closest(".field");
+    if (!field) return valid;
+    const errorId = `${element.id || element.name}-error`;
+    let message = field.querySelector(`[id="${errorId}"]`);
+    if (!valid && !message) {
+      message = document.createElement("small");
+      message.id = errorId;
+      message.className = "field-error";
+      message.setAttribute("role", "alert");
+      field.append(message);
+    }
+    if (message) message.hidden = valid;
+    const related = element.name === "meta-source-type"
+      ? Array.from(document.querySelectorAll('input[name="meta-source-type"]')) : [element];
+    const errorText = valid ? "" : fieldErrorMessage(element);
+    if (!valid) message.textContent = errorText;
+    for (const input of related) {
+      input.setCustomValidity?.(errorText);
+      input.classList.toggle("invalid", !valid);
+      const descriptions = new Set((input.getAttribute("aria-describedby") || "").split(/\s+/).filter(Boolean));
+      descriptions.delete(errorId);
+      if (valid) input.removeAttribute("aria-invalid");
+      else { input.setAttribute("aria-invalid", "true"); descriptions.add(errorId); }
+      if (descriptions.size) input.setAttribute("aria-describedby", Array.from(descriptions).join(" "));
+      else input.removeAttribute("aria-describedby");
+    }
+    return valid;
+  }
+  function validateFields(checks) {
+    let firstInvalid = null;
+    let allValid = true;
+    for (const [element, valid] of checks) {
+      if (!setFieldValidity(element, valid)) {
+        allValid = false;
+        if (!firstInvalid && element && (!element.disabled || element.dataset.routineDisabled === "true") && element.getClientRects().length) firstInvalid = element;
+      }
+    }
+    if (firstInvalid) {
+      // A recusa encerra o bloqueio temporário da rotina antes de apresentar o balão.
+      queueMicrotask(() => {
+        if (firstInvalid.disabled || !firstInvalid.getClientRects().length || firstInvalid.getAttribute("aria-invalid") !== "true") return;
+        firstInvalid.focus();
+        firstInvalid.reportValidity?.();
+      });
+    }
+    return allValid;
+  }
+  function clearFieldErrors(container) {
+    container.querySelectorAll(".invalid").forEach(element => setFieldValidity(element, true));
+  }
   const lotCodeInput = byId("lot-code");
   const operatorNameInput = byId("operator-name");
   const operatorCpfInput = byId("operator-cpf");
@@ -126,6 +208,10 @@
     if (isAwaitingSignedDeclaration()) ui.enableSignedDeclarationControls();
     if (hasPendingContainer()) ui.lockPreparedContainerControls();
     renderEvidence();
+    ui.renderCreationStages();
+    byId("select-container").disabled = routineState.active || byId("container-input").disabled;
+    byId("replace-container").disabled = byId("select-container").disabled;
+    byId("open-receipt").disabled = routineState.active || byId("container-input").disabled || !auditState.selectedContainer;
   }
 
   ui = createUi({
@@ -156,14 +242,33 @@
       creationSecretInputs: Object.freeze([lotSecretInput, lotSecretConfirmInput]),
       secretInputs: Object.freeze([lotSecretInput, lotSecretConfirmInput, byId("audit-secret")]),
       tabButtons: Object.freeze(Array.from(document.querySelectorAll(".tab-button"))),
-      tabPanels: Object.freeze(Array.from(document.querySelectorAll(".tab-panel")))
+      tabPanels: Object.freeze(Array.from(document.querySelectorAll(".tab-panel"))),
+      stageButtons: Array.from(document.querySelectorAll("[data-stage]")), stagePanels: Array.from(document.querySelectorAll("[data-stage-panel]")),
+      nextStageButtons: Array.from(document.querySelectorAll("[data-next-stage]")),
+      qualificationStatus: byId("qualification-status"),
+      firstFile: byId("first-file"), evidencePanel: byId("evidence-panel"), addFirstFile: byId("add-first-file"),
+      emitDocument: byId("emit-document"), declarationStatus: byId("declaration-status"),
+      signedSelection: byId("signed-selection"), signedChecks: byId("signed-checks"), signedName: byId("signed-file-name"), signedHash: byId("signed-file-hash"), signedCheckResults: byId("signed-check-results"),
+      sealCount: byId("seal-count"), sealDocument: byId("seal-document"), beginSealing: byId("begin-sealing"), closingStatus: byId("closing-status"), homeDraft: byId("home-draft"),
+      backHome: byId("back-home"), environmentHome: byId("home-environment-slot"),
+      aboutPanel: byId("about-panel"), aboutContent: byId("about-session-content"),
+      aboutTemplate: byId("about-content-template")
     }),
     routine: routineState,
     beginRoutineTransition: beginRoutine,
     endRoutineTransition: endRoutine,
     createElement: tagName => document.createElement(tagName),
+    scrollToStart: () => window.scrollTo({ top: 0, behavior: "instant" }),
     schedule: (callback, milliseconds) => window.setTimeout(callback, milliseconds),
-    synchronizeCreationControls
+    synchronizeCreationControls,
+    creationPresentation: () => ({
+      hasShownEvidenceList: state.hasShownEvidenceList, locked: state.locked, runtimeReady: state.runtimeReady,
+      documentId: state.documentId, evidenceCount: state.evidence.length,
+      qualifiedCount: state.evidence.filter(item => item.metadata).length,
+      signedSelection: state.signedSelection ? { name: state.signedSelection.file.name, sha256: state.signedSelection.sha256, inspection: state.signedSelection.inspection } : null,
+      planPending: Boolean(state.pendingContainer), downloadRequested: Boolean(state.pendingContainer?.fallbackArtifact), containerSaved: state.containerSaved
+    }),
+    creationStages: core.selectors.creationStages
   });
   const {
     escapeHtml,
@@ -175,6 +280,14 @@
     switchTab,
     maskSecretInputs
   } = ui;
+
+  document.querySelector(".intro-learn-more").addEventListener("click", event => {
+    event.preventDefault();
+    ui.openAbout(event.currentTarget);
+  });
+  byId("about-session-content").addEventListener("click", event => {
+    if (event.target.closest("[data-close-about]")) { event.preventDefault(); ui.closeAbout(); }
+  });
 
 
   const fileIo = createFileIo({
@@ -209,6 +322,28 @@
   const { saveBlob, saveContainerPlan, saveProtectedRecord } = fileIo;
 
 
+  const reuseFields = Object.freeze({
+    "meta-id": "Código/ID de rastreamento", "meta-nature": "Tipo/descrição do vestígio",
+    "meta-responsible": "Responsável pela coleta", "meta-datetime": "Data e hora da coleta",
+    "meta-location": "Local físico ou ambiente virtual", "meta-description": "Descrição do procedimento",
+    "meta-source-type": "Origem/forma de obtenção", "meta-unavailability-reason": "Situação da fonte primária",
+    "meta-unavailability": "Informações complementares"
+  });
+  const reuseControls = Object.entries(reuseFields).map(([fieldId, label]) => {
+    const input = fieldId === "meta-source-type" ? metadataForm.querySelector('input[name="meta-source-type"]') : byId(fieldId);
+    const disclosure = document.createElement("details");
+    disclosure.className = "reuse-disclosure";
+    disclosure.hidden = true;
+    const trigger = document.createElement("summary");
+    trigger.textContent = "Reaproveitar dados";
+    trigger.setAttribute("aria-label", `Reaproveitar dados: ${label}`);
+    const select = document.createElement("select");
+    select.dataset.copyField = fieldId;
+    select.setAttribute("aria-label", `Selecionar vestígio para copiar: ${label}`);
+    disclosure.append(trigger, select);
+    input.closest(".field").append(disclosure);
+    return select;
+  });
   const lot = createLot({
     store: state,
     elements: Object.freeze({
@@ -253,6 +388,9 @@
       photoAddLabel: byId("photo-add-label"),
       photoList: byId("photo-list"),
       metaDocuments: byId("meta-documents"),
+      metadataForm,
+      reuseControls: Object.freeze(reuseControls),
+      reuseStatus: byId("reuse-status"),
       documentCount: byId("document-count"),
       documentAddLabel: byId("document-add-label"),
       documentList: byId("document-list"),
@@ -262,6 +400,9 @@
       escapeHtml,
       showToast,
       friendlyErrorMessage,
+      validateFields,
+      clearFieldErrors,
+      refreshCreationPresentation: () => ui.renderCreationStages(),
       setActivityProgress,
       beginExclusiveRoutine,
       endExclusiveRoutine
@@ -337,12 +478,16 @@
     setCreateControlsLocked(blocked);
     byId("container-input").disabled = blocked;
     byId("open-container").disabled = blocked;
+    byId("select-container").disabled = blocked;
+    byId("replace-container").disabled = blocked;
+    byId("open-receipt").disabled = blocked || !auditState.selectedContainer;
     const status = byId("secure-context-status");
     if (blocked) {
       status.textContent = "Outra aba mantém uma operação formal";
       status.classList.add("warning");
     } else if (preparedStatusText) {
       status.textContent = preparedStatusText;
+      status.dataset.prepared = "true";
       status.classList.remove("warning");
     }
   }
@@ -572,6 +717,7 @@
     ui: Object.freeze({
       showToast,
       friendlyErrorMessage,
+      validateFields,
       beginExclusiveRoutine,
       endExclusiveRoutine,
       setActivityProgress,
@@ -589,6 +735,8 @@
     pdfApi: window.LDFPdf,
     validationApi: window.LDFValidation,
     selectors: Object.freeze({ hasPendingContainer }),
+    sourceTypeLabels: SOURCE_TYPE_LABELS,
+    primarySourceStatusLabels: PRIMARY_SOURCE_STATUS_LABELS,
     transitions: Object.freeze({ setPendingContainer, setContainerSaved, setShippingReceipt }),
     domain: Object.freeze({
       formatCpfInput,
@@ -603,8 +751,8 @@
   const {
     generateStrongSecret,
     generateInitialDeclaration,
-    guardSignedDeclarationSelection,
-    sealSignedDeclaration,
+    selectSignedDeclaration,
+    prepareContainerPlan,
     savePendingContainer,
     confirmFallbackContainerDownload,
     saveShippingReceipt
@@ -658,7 +806,12 @@
     resetCreation();
     operationCoordination.release();
     byId("lot-form").reset();
-    byId("lot-secret-help").textContent = "Mínimo de 12 caracteres. O servidor não recebe nem recupera esta chave.";
+    byId("seal-form").reset();
+    ui.clearCreationSecret();
+    byId("declarant-dialog").close();
+    byId("seal-dialog").close();
+    ui.resetNavigation();
+    byId("lot-secret-help").textContent = "O servidor não recebe nem recupera esta chave. Insira uma senha no mínimo com 12 caracteres.";
     signedInput.value = "";
     signedInput.disabled = true;
     byId("signed-label").classList.add("disabled");
@@ -669,8 +822,7 @@
     byId("confirm-container-download").disabled = false;
     byId("save-shipping-receipt").classList.add("hidden");
     byId("save-shipping-receipt").disabled = false;
-    byId("step-one").className = "step current";
-    byId("step-two").className = "step";
+    ui.resetNavigation();
     setActivityProgress("operation-progress", false);
     operationLog.innerHTML = "";
     setCreateControlsLocked(false);
@@ -687,6 +839,10 @@
     routine: routineState,
     elements: Object.freeze({
       auditForm: byId("audit-form"),
+      receivingDialog: byId("audit-receipt-dialog"), selectedContainerName: byId("selected-container-name"),
+      signatureNote: byId("audit-signature-note"),
+      auditFirst: byId("audit-first"), auditSelected: byId("audit-selected"),
+      auditSteps: [...document.querySelectorAll("[data-audit-step]")], auditResults: byId("audit-results"),
       containerInput: byId("container-input"),
       receiverNameInput: byId("receiver-name"),
       receiverCpfInput: byId("receiver-cpf"),
@@ -701,6 +857,7 @@
       escapeHtml,
       showToast,
       friendlyErrorMessage,
+      validateFields,
       setActivityProgress,
       beginExclusiveRoutine,
       endExclusiveRoutine
@@ -718,6 +875,8 @@
       signedDeclarationFileName: lotCode => window.LDFValidation.signedDeclarationFileName(lotCode),
       reviewDeclarationFileName: lotCode => window.LDFValidation.reviewDeclarationFileName(lotCode),
       validateManifest: (...args) => window.LDFValidation.validateManifest(...args),
+      normalizePersonalName: value => window.LDFValidation.normalizePersonalName(value),
+      isValidPersonalName: value => window.LDFValidation.isValidPersonalName(value),
       inspectPdf: (...args) => window.LDFValidation.inspectPdf(...args),
       qualifiedLotRecordFromManifest: manifest => window.LDFValidation.qualifiedLotRecordFromManifest(manifest)
     }),
@@ -736,7 +895,7 @@
     confirmAction: message => window.confirm(message),
     reloadApplication: () => window.location.reload()
   });
-  const { resetAudit, openAndAudit, saveAuditDownload, analyzeAuditFile } = audit;
+  const { resetAudit, openAndAudit, selectContainer, clearReceivingSecret, saveAuditDownload, analyzeAuditFile } = audit;
 
   function initializeSessionDisclosures() {
     const groups = [
@@ -793,7 +952,7 @@
   function renderTemporalPreflight(reference) {
     function present(stateClass, statusText, detailText) {
       const hidden = stateClass === "coherent" ? " hidden" : "";
-      for (const prefix of ["temporal-preflight", "audit-temporal-preflight"]) {
+      for (const prefix of ["temporal-preflight", "audit-temporal-preflight", "home-temporal-preflight"]) {
         byId(prefix).className = `temporal-preflight ${stateClass}${hidden}`;
         byId(`${prefix}-status`).textContent = statusText;
         byId(`${prefix}-detail`).textContent = detailText;
@@ -885,12 +1044,15 @@
     }
     setCreateControlsLocked(false);
     byId("container-input").disabled = false;
+    byId("select-container").disabled = false;
+    byId("replace-container").disabled = false;
     byId("open-container").disabled = false;
     const status = byId("secure-context-status");
     preparedStatusText = runtime.workerAvailable
       ? "Ambiente criptográfico preparado"
       : "Ambiente preparado com processamento local";
     status.textContent = preparedStatusText;
+    status.dataset.prepared = "true";
     if (!analysisRuntime.available) {
       addLog("MediaInfo local indisponível nesta sessão; o fluxo principal permanece disponível.", "warning");
     }
@@ -919,6 +1081,102 @@
   for (const cpfInput of [operatorCpfInput, byId("receiver-cpf")]) {
     cpfInput.addEventListener("input", () => { cpfInput.value = formatCpfInput(cpfInput.value); });
   }
+  function liveFieldValidity(element) {
+    const value = element.value.trim();
+    switch (element.id) {
+      case "lot-code": return /^[\p{L}\p{N}_-]{1,60}$/u.test(value);
+      case "operator-name":
+      case "receiver-name":
+      case "meta-responsible": return window.LDFValidation.isValidPersonalName(element.value);
+      case "operator-cpf":
+      case "receiver-cpf": return isValidCpf(formatCpfInput(value));
+      case "lot-secret":
+      case "audit-secret": return element.value.length >= MIN_SECRET_LENGTH && element.value.length <= MAX_SECRET_LENGTH;
+      case "lot-secret-confirm": return Boolean(element.value) && element.value === lotSecretInput.value;
+      case "meta-datetime": {
+        try {
+          return window.LDFValidation.isCollectionDateTimeOnOrBefore(brazilianDateTimeToInput(value), localDateTime());
+        } catch { return false; }
+      }
+      case "meta-id": return value.length >= 1 && value.length <= 80;
+      case "meta-nature": return value.length >= 1 && value.length <= 120;
+      case "meta-location": return value.length >= 1 && value.length <= 240;
+      case "meta-description": return value.length >= 1 && value.length <= MAX_DESCRIPTION_LENGTH;
+      case "meta-unavailability-reason": return value in PRIMARY_SOURCE_STATUS_LABELS;
+      case "meta-unavailability": return byId("meta-unavailability-reason").value !== "other" || value.length >= 1;
+      default: return true;
+    }
+  }
+  const controlledFields = [
+    "lot-code", "operator-name", "operator-cpf", "lot-secret", "lot-secret-confirm",
+    "receiver-name", "receiver-cpf", "audit-secret", "meta-id", "meta-nature",
+    "meta-responsible", "meta-datetime", "meta-location", "meta-description",
+    "meta-unavailability-reason", "meta-unavailability"
+  ];
+  function refreshFieldError(element) {
+    if (element.classList.contains("invalid")) setFieldValidity(element, liveFieldValidity(element));
+  }
+  // A quebra é visual: estes campos preservam a entrada e o Enter de uma linha.
+  const textareaValue = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value");
+  for (const field of document.querySelectorAll("textarea.scrollable-text-field")) {
+    const stripLineBreaks = value => value.replace(/[\r\n]/g, "");
+    // Atribuições de abertura/reaproveitamento também conservam a remoção de CR/LF.
+    Object.defineProperty(field, "value", {
+      configurable: true,
+      enumerable: textareaValue.enumerable,
+      get() { return textareaValue.get.call(this); },
+      set(value) { textareaValue.set.call(this, stripLineBreaks(value === null ? "" : String(value))); }
+    });
+    field.addEventListener("input", () => {
+      const value = field.value;
+      if (!/[\r\n]/.test(value)) return;
+      const start = stripLineBreaks(value.slice(0, field.selectionStart)).length;
+      const end = stripLineBreaks(value.slice(0, field.selectionEnd)).length;
+      field.value = stripLineBreaks(value);
+      field.setSelectionRange(start, end);
+    }, { capture: true });
+    field.addEventListener("beforeinput", event => {
+      if (["insertLineBreak", "insertParagraph"].includes(event.inputType)) event.preventDefault();
+    });
+    field.addEventListener("paste", event => {
+      const text = event.clipboardData?.getData("text/plain");
+      if (!text || !/[\r\n]/.test(text)) return;
+      event.preventDefault();
+      const available = Math.max(0, field.maxLength - (field.value.length - (field.selectionEnd - field.selectionStart)));
+      field.setRangeText(stripLineBreaks(text).slice(0, available), field.selectionStart, field.selectionEnd, "end");
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    field.addEventListener("keydown", event => {
+      if (event.key !== "Enter" || event.isComposing) return;
+      event.preventDefault();
+      if (event.ctrlKey || event.altKey || event.metaKey) return;
+      const submit = field.form?.querySelector('button[type="submit"], input[type="submit"], button:not([type])');
+      if (submit && !submit.matches(":disabled")) submit.click();
+    });
+  }
+  for (const id of controlledFields) {
+    const element = byId(id);
+    element.addEventListener("invalid", () => setFieldValidity(element, false));
+    for (const eventName of ["input", "change"]) element.addEventListener(eventName, () => {
+      refreshFieldError(element);
+      if (id === "lot-secret") refreshFieldError(lotSecretConfirmInput);
+      if (id === "meta-unavailability-reason") refreshFieldError(byId("meta-unavailability"));
+      lot.discardReuseReference(id);
+    });
+    element.addEventListener("blur", () => {
+      if ((element.value.trim() || element.classList.contains("invalid")) && !element.disabled && !element.closest("[hidden]")) setFieldValidity(element, liveFieldValidity(element));
+    });
+  }
+  for (const sourceType of document.querySelectorAll('input[name="meta-source-type"]')) {
+    sourceType.addEventListener("invalid", () => setFieldValidity(sourceType, false));
+    sourceType.addEventListener("change", () => { setFieldValidity(sourceType, true); lot.discardReuseReference("meta-source-type"); });
+  }
+  for (const select of reuseControls) select.addEventListener("change", () => {
+    if (select.value) lot.copyMetadataField(select.dataset.copyField, select.value);
+    select.value = "";
+    select.closest("details").open = false;
+    select.closest("details").querySelector("summary").focus();
+  });
   evidenceInput.addEventListener("change", async () => {
     if (evidenceInput.files.length && !await acquireFormalOperation()) {
       evidenceInput.value = "";
@@ -942,7 +1200,7 @@
   });
   metadataForm.addEventListener("input", updateQualificationProgress);
   metadataForm.addEventListener("change", updateQualificationProgress);
-  byId("meta-datetime-picker").addEventListener("change", applySelectedMetadataDateTime);
+  byId("meta-datetime-picker").addEventListener("change", () => { applySelectedMetadataDateTime(); refreshFieldError(byId("meta-datetime")); });
   byId("meta-datetime").addEventListener("blur", synchronizeMetadataDateTimePicker);
   byId("meta-datetime-trigger").addEventListener("click", openMetadataDateTimePicker);
   byId("meta-photos").addEventListener("change", () => addMetadataPhotos(byId("meta-photos").files));
@@ -971,30 +1229,79 @@
     event.currentTarget.setAttribute("aria-expanded", String(reveal));
     event.currentTarget.textContent = reveal ? "Ocultar localização registrada" : "Exibir localização registrada";
   });
-  byId("generate-secret").addEventListener("click", generateStrongSecret);
-  byId("generate-declaration").addEventListener("click", generateInitialDeclaration);
-  byId("signed-label").addEventListener("click", guardSignedDeclarationSelection);
-  signedInput.addEventListener("change", () => sealSignedDeclaration(signedInput.files[0]));
+  byId("generate-secret").addEventListener("click", () => { generateStrongSecret(); refreshFieldError(lotSecretInput); refreshFieldError(lotSecretConfirmInput); });
+  const declarantDialog = byId("declarant-dialog");
+  const sealDialog = byId("seal-dialog");
+  byId("emit-document").addEventListener("click", event => {
+    clearFieldErrors(byId("lot-form"));
+    ui.openCreationDialog(declarantDialog, event.currentTarget, lotCodeInput);
+  });
+  byId("lot-form").addEventListener("submit", async event => {
+    event.preventDefault();
+    await generateInitialDeclaration();
+    if (core.selectors.creationStages()[1].completed) { declarantDialog.close(); ui.visitCreationStage(3); }
+    ui.renderCreationStages();
+  });
+  for (const id of ["close-declaration", "cancel-declaration"]) byId(id).addEventListener("click", () => declarantDialog.close());
+  declarantDialog.addEventListener("close", () => ui.returnFromCreationDialog(declarantDialog));
+  byId("begin-sealing").addEventListener("click", event => {
+    clearFieldErrors(byId("seal-form"));
+    ui.openCreationDialog(sealDialog, event.currentTarget, lotSecretInput, true);
+  });
+  byId("seal-form").addEventListener("submit", async event => {
+    event.preventDefault();
+    if (await prepareContainerPlan()) sealDialog.close();
+    ui.renderCreationStages();
+  });
+  for (const id of ["close-seal", "cancel-seal"]) byId(id).addEventListener("click", () => sealDialog.close());
+  sealDialog.addEventListener("close", () => ui.returnFromCreationDialog(sealDialog, true));
+  signedInput.addEventListener("change", async () => { await selectSignedDeclaration(signedInput.files[0]); ui.renderCreationStages(); });
+  byId("signed-label").addEventListener("click", event => { if (signedInput.disabled || routineState.active) event.preventDefault(); });
+  byId("signed-label").addEventListener("keydown", event => { if (["Enter", " "].includes(event.key)) { event.preventDefault(); if (!signedInput.disabled && !routineState.active) signedInput.click(); } });
+  byId("add-first-file").addEventListener("click", () => { if (!evidenceInput.disabled) evidenceInput.click(); });
+  document.querySelectorAll("[data-stage], [data-next-stage]").forEach(button => button.addEventListener("click", () => ui.visitCreationStage(Number(button.dataset.stage || button.dataset.nextStage))));
+  byId("back-home").addEventListener("click", () => switchTab("home"));
   byId("save-container").addEventListener("click", savePendingContainer);
-  byId("confirm-container-download").addEventListener("click", confirmFallbackContainerDownload);
+  byId("confirm-container-download").addEventListener("click", () => { confirmFallbackContainerDownload(); ui.renderCreationStages(); });
   byId("save-shipping-receipt").addEventListener("click", saveShippingReceipt);
   byId("reset-operation").addEventListener("click", resetOperation);
-  byId("reset-audit").addEventListener("click", resetAudit);
+  byId("reset-audit").addEventListener("click", () => { resetAudit(); synchronizeCreationControls(); });
   byId("save-log-pdf").addEventListener("click", saveOperationTrailPdf);
   byId("clear-log").addEventListener("click", () => {
     state.logs.forEach(entry => { entry.visible = false; });
     operationLog.innerHTML = "";
   });
+  const receivingDialog = byId("audit-receipt-dialog");
+  let receivingTrigger = null;
+  function openReceivingDialog(trigger) {
+    if (routineState.active || !state.runtimeReady || !auditState.selectedContainer) return;
+    clearReceivingSecret();
+    clearFieldErrors(byId("audit-form"));
+    receivingTrigger = trigger;
+    byId("receipt-container-name").textContent = auditState.selectedContainer.name;
+    receivingDialog.showModal();
+    byId("receiver-name").focus({ preventScroll: true });
+  }
+  byId("select-container").addEventListener("click", () => { if (!routineState.active && !byId("container-input").disabled) byId("container-input").click(); });
+  byId("replace-container").addEventListener("click", () => { if (!routineState.active && !byId("container-input").disabled) byId("container-input").click(); });
+  byId("open-receipt").addEventListener("click", event => openReceivingDialog(event.currentTarget));
   byId("container-input").addEventListener("change", async event => {
     const file = event.target.files[0];
-    if (file && !file.name.toLowerCase().endsWith(".ldf")) {
-      event.target.value = "";
-      showToast("O arquivo selecionado não é um contêiner LDF Web.", "error");
-      return;
+    if (!file || routineState.active) return;
+    if (!file.name.toLowerCase().endsWith(".ldf")) { selectContainer(file); synchronizeCreationControls(); return; }
+    if (!await acquireFormalOperation()) { event.target.value = ""; return; }
+    if (selectContainer(file)) {
+      byId("open-receipt").disabled = false;
+
     }
-    if (file && !await acquireFormalOperation()) event.target.value = "";
   });
-  byId("audit-form").addEventListener("submit", openAndAudit);
+  byId("audit-form").addEventListener("submit", async event => { if (await openAndAudit(event)) receivingDialog.close(); });
+  for (const id of ["close-receipt", "cancel-receipt"]) byId(id).addEventListener("click", () => receivingDialog.close());
+  receivingDialog.addEventListener("close", () => {
+    clearReceivingSecret();
+    if (receivingTrigger?.isConnected) receivingTrigger.focus({ preventScroll: true });
+    receivingTrigger = null;
+  });
   byId("audit-content").addEventListener("click", async event => {
     const infoButton = event.target.closest("button[data-file-info-index]");
     if (!infoButton) {
@@ -1016,7 +1323,7 @@
     setActivityProgress("audit-progress", true, `Lendo informações técnicas de ${item.name}...`);
     try {
       const fileInfo = await analyzeAuditFile(downloadIndex);
-      openFileInfoDialog(item.name, item.c2pa, fileInfo);
+      if (auditState.downloads[downloadIndex] === item) openFileInfoDialog(item.name, item.c2pa, fileInfo);
     } finally {
       setActivityProgress("audit-progress", false);
       endExclusiveRoutine();

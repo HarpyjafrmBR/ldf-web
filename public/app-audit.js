@@ -39,9 +39,59 @@
       const message = c2paMessage(result.c2pa);
       return `<button class="c2pa-indicator ${result.c2pa?.status === "detected" ? "detected" : "muted"}" type="button" data-file-info-index="${downloadIndex}" data-c2pa-only="true" data-tooltip="${auditUi.escapeHtml(message)}" aria-label="C2PA — ${auditUi.escapeHtml(message)}">C2PA</button>`;
     }
-    async function ensureTemporalSession() {
+    function renderOpeningSelection() {
+      const selected = Boolean(store.selectedContainer);
+      if (elements.auditFirst) elements.auditFirst.hidden = selected;
+      if (elements.auditSelected) elements.auditSelected.hidden = !selected;
+      const complete = !elements.auditContent.classList.contains("hidden");
+      for (const step of elements.auditSteps ?? []) {
+        const number = Number(step.dataset.auditStep);
+        step.classList.toggle("done", complete || (selected && number === 1));
+        if (!complete && number === (selected ? 2 : 1)) step.setAttribute("aria-current", "step");
+        else step.removeAttribute("aria-current");
+      }
+    }
+
+    function clearResult() {
+      transitions.clearAuditDownloads();
+      store.auditPdf = null;
+      store.auditPdfName = "";
+      elements.auditContent.innerHTML = "";
+      elements.auditContent.classList.add("hidden");
+      elements.auditEmpty.classList.remove("hidden");
+      if (elements.auditResults) elements.auditResults.hidden = true;
+      renderOpeningSelection();
+    }
+
+    function selectContainer(file) {
+      if (!file || routine.active || !selectors.isRuntimeReady()) return false;
+      store.selectionRevision = (store.selectionRevision || 0) + 1;
+      store.selectedContainer = null;
+      clearResult();
+      elements.receiverNameInput.value = "";
+      elements.receiverCpfInput.value = "";
+      clearReceivingSecret();
+      if (!file.name.toLowerCase().endsWith(".ldf")) {
+        elements.containerInput.value = "";
+        elements.auditSummary.textContent = "A seleção não é um contêiner LDF Web";
+        if (elements.selectedContainerName) elements.selectedContainerName.textContent = "Nenhum contêiner selecionado";
+        auditUi.showToast("O arquivo selecionado não é um contêiner LDF Web.", "error");
+        renderOpeningSelection();
+        return false;
+      }
+      store.selectedContainer = file;
+      elements.auditSummary.textContent = "Contêiner selecionado; aguardando os dados do recebimento";
+      if (elements.selectedContainerName) elements.selectedContainerName.textContent = file.name;
+      renderOpeningSelection();
+      return true;
+    }
+
+    function clearReceivingSecret() { elements.auditSecretInput.value = ""; elements.auditSecretInput.type = "password"; }
+
+    async function ensureTemporalSession(revision = store.selectionRevision || 0) {
       if (!store.temporalSession) {
-        store.temporalSession = await temporal.startSession("abertura e auditoria");
+        const session = await temporal.startSession("abertura e auditoria");
+        if ((store.selectionRevision || 0) === revision) store.temporalSession = session;
       }
       return store.temporalSession;
     }
@@ -61,7 +111,7 @@
         return;
       }
       const hasFormData = Boolean(
-        elements.containerInput.files[0]
+        store.selectedContainer || elements.containerInput.files[0]
         || elements.receiverNameInput.value
         || elements.receiverCpfInput.value
         || elements.auditSecretInput.value
@@ -70,6 +120,9 @@
       if ((hasFormData || hasResults) && !confirmAction("Limpar os dados e os resultados da auditoria atual?")) return;
 
       elements.auditForm.reset();
+      elements.containerInput.value = "";
+      if (elements.selectedContainerName) elements.selectedContainerName.textContent = "Nenhum contêiner selecionado";
+      elements.receivingDialog?.close();
       elements.auditSecretInput.type = "password";
       elements.auditSummary.textContent = "Aguardando um contêiner";
       auditUi.setActivityProgress("audit-progress", false);
@@ -77,6 +130,7 @@
       elements.auditContent.classList.add("hidden");
       elements.auditEmpty.classList.remove("hidden");
       transitions.clearAudit();
+      clearResult();
       auditUi.showToast("Auditoria reiniciada.");
     }
 
@@ -115,6 +169,8 @@
       const documentCount = results.reduce((total, result) => total + result.documents.length, 0);
       elements.auditEmpty.classList.add("hidden");
       elements.auditContent.classList.remove("hidden");
+      if (elements.auditResults) elements.auditResults.hidden = false;
+      renderOpeningSelection();
       if (!evidenceOk) {
         elements.auditSummary.textContent = "Foram encontradas divergências de hash";
       } else if (!declarationCheck.canonicalLotHashMatches) {
@@ -140,21 +196,15 @@
         <div class="metric"><span>Declaração de registro</span><strong>${auditUi.escapeHtml(manifest.initialDocumentId)}</strong></div>
         <div class="metric"><span>Início do lacre e salvamento</span><strong>${auditUi.escapeHtml(manifest.sealedAt)}</strong></div>
       </div>
+      ${!declarationCheck.idMatches || !declarationCheck.lotHashMatches || !declarationCheck.signatureMarkersDetected ? `
       <div class="declaration-checks" aria-label="Conferência da declaração de registro">
-        <div class="declaration-check-row">
-          <strong>Busca textual do identificador na declaração</strong>
-          <span class="result-status ${declarationCheck.idMatches ? "" : "warning"}">${declarationCheck.idMatches ? "TEXTO LOCALIZADO — INDÍCIO" : "TEXTO NÃO LOCALIZADO"}</span>
-        </div>
-        <div class="declaration-check-row">
-          <strong>Vínculo do conjunto qualificado</strong>
-          <span class="result-status ${declarationCheck.lotHashMatches ? "" : "bad"}">${declarationCheck.lotHashMatches ? "HASH CANÔNICO CONFERE; TEXTO LOCALIZADO" : "HASH OU TEXTO DIVERGENTE"}</span>
-        </div>
-        <div class="declaration-check-row">
-          <strong>Estruturas aparentes de assinatura digital</strong>
-          <span class="result-status warning">${declarationCheck.signatureMarkersDetected ? "INDÍCIOS LOCALIZADOS" : "INDÍCIOS NÃO LOCALIZADOS"}</span>
-        </div>
-        <p class="declaration-check-note">Buscas textuais e marcadores aparentes não validam assinatura, autoria ou vínculo semântico. Confira visualmente a declaração e valide a assinatura no serviço VALIDAR do Governo Federal.</p>
-      </div>
+        <h3>Conferência da declaração de registro</h3>
+        ${!declarationCheck.idMatches ? `<div class="declaration-check-row"><strong>Busca textual do identificador na declaração</strong><span class="result-status warning">TEXTO NÃO LOCALIZADO</span></div>` : ""}
+        ${!declarationCheck.lotHashMatches ? `<div class="declaration-check-row"><strong>Vínculo do conjunto qualificado</strong><span class="result-status bad">HASH OU TEXTO DIVERGENTE</span></div>` : ""}
+        ${!declarationCheck.signatureMarkersDetected ? `<div class="declaration-check-row"><strong>Estruturas aparentes de assinatura digital</strong><span class="result-status warning">INDÍCIOS NÃO LOCALIZADOS</span></div>` : ""}
+        <p class="declaration-check-note">Confira visualmente a declaração e valide a assinatura no serviço VALIDAR do Governo Federal.</p>
+      </div>` : ""}
+      <h3 class="audit-evidence-title">Vestígios do lote</h3>
       <div class="result-list">
         ${resultViewModels.map(result => `
           <div class="result-row">
@@ -167,7 +217,7 @@
             </div>
             <span class="result-status ${result.status === HASH_CONVERGENT_STATUS ? "" : "bad"}">${auditUi.escapeHtml(result.status)}</span>
             <div class="save-control">
-              <button class="button secondary" type="button" data-download-index="${result.downloadIndex}">Salvar</button>
+              <button class="button secondary" type="button" data-download-index="${result.downloadIndex}" ${result.status === HASH_CONVERGENT_STATUS ? "" : "disabled"}>Salvar</button>
               <div class="inline-activity hidden" role="status" aria-label="Salvamento em andamento"><div class="activity-track" aria-hidden="true"><span></span></div></div>
             </div>
           </div>
@@ -176,7 +226,7 @@
               <strong title="${auditUi.escapeHtml(photo.name)}">Foto complementar: ${auditUi.escapeHtml(photo.name)}</strong>
               <span class="result-status ${photo.status === HASH_CONVERGENT_STATUS ? "" : "bad"}">${auditUi.escapeHtml(photo.status)}</span>
               <div class="save-control">
-                <button class="button secondary" type="button" data-download-index="${photo.downloadIndex}">Salvar</button>
+                <button class="button secondary" type="button" data-download-index="${photo.downloadIndex}" ${photo.status === HASH_CONVERGENT_STATUS ? "" : "disabled"}>Salvar</button>
                 <div class="inline-activity hidden" role="status" aria-label="Salvamento em andamento"><div class="activity-track" aria-hidden="true"><span></span></div></div>
               </div>
             </div>
@@ -186,7 +236,7 @@
               <strong title="${auditUi.escapeHtml(documentResult.name)}">Documento complementar: ${auditUi.escapeHtml(documentResult.name)}</strong>
               <span class="result-status ${documentResult.status === HASH_CONVERGENT_STATUS ? "" : "bad"}">${auditUi.escapeHtml(documentResult.status)}</span>
               <div class="save-control">
-                <button class="button secondary" type="button" data-download-index="${documentResult.downloadIndex}">Salvar</button>
+                <button class="button secondary" type="button" data-download-index="${documentResult.downloadIndex}" ${documentResult.status === HASH_CONVERGENT_STATUS ? "" : "disabled"}>Salvar</button>
                 <div class="inline-activity hidden" role="status" aria-label="Salvamento em andamento"><div class="activity-track" aria-hidden="true"><span></span></div></div>
               </div>
             </div>
@@ -194,6 +244,7 @@
         `).join("")}
       </div>
       ${declarationBlockReason ? `<p class="declaration-check-note" role="alert">${auditUi.escapeHtml(declarationBlockReason)}</p>` : ""}
+      ${elements.signatureNote?.innerHTML ?? ""}
       <div class="audit-actions">
         <div class="save-control">
           <button class="button secondary" type="button" data-download-index="${signedDeclarationDownloadIndex}">Declaração de registro</button>
@@ -264,10 +315,14 @@
     }
 
     async function openAndAudit(event) {
-      event.preventDefault();
+      event?.preventDefault();
+      if (routine.active) return false;
       if (!selectors.isRuntimeReady()) return auditUi.showToast("Aguarde a preparação do ambiente criptográfico.", "warning");
-      const file = elements.containerInput.files[0];
-      const receiverName = elements.receiverNameInput.value.trim();
+      const file = store.selectedContainer || elements.containerInput.files[0];
+      const revision = store.selectionRevision || 0;
+      const isCurrent = () => (store.selectionRevision || 0) === revision;
+      clearResult();
+      const receiverName = validationApi.normalizePersonalName(elements.receiverNameInput.value);
       const receiverCpf = domain.formatCpfInput(elements.receiverCpfInput.value);
       const secret = elements.auditSecretInput.value;
       if (!file) return auditUi.showToast("Selecione um contêiner LDF Web.", "error");
@@ -275,18 +330,27 @@
         elements.containerInput.value = "";
         return auditUi.showToast("O arquivo selecionado não é um contêiner LDF Web.", "error");
       }
-      if (receiverName.length < 3) return auditUi.showToast("Informe o nome completo do recebedor.", "error");
+      auditUi.validateFields?.([
+        [elements.receiverNameInput, validationApi.isValidPersonalName(elements.receiverNameInput.value)],
+        [elements.receiverCpfInput, domain.isValidCpf(receiverCpf)],
+        [elements.auditSecretInput, secret.length >= limits.minSecretLength && secret.length <= limits.maxSecretLength]
+      ]);
+      if (!validationApi.isValidPersonalName(elements.receiverNameInput.value)) return auditUi.showToast("Informe o nome completo do recebedor.", "error");
       if (!domain.isValidCpf(receiverCpf)) return auditUi.showToast("Informe um CPF válido para o recebedor.", "error");
       if (secret.length < limits.minSecretLength || secret.length > limits.maxSecretLength) {
         return auditUi.showToast(`A chave de acesso deve ter entre ${limits.minSecretLength} e ${limits.maxSecretLength} caracteres.`, "error");
       }
+      elements.receiverNameInput.value = receiverName;
+      if (elements.auditResults) elements.auditResults.hidden = false;
       try {
-        await ensureTemporalSession();
+        await ensureTemporalSession(revision);
+        if (!isCurrent()) return false;
         const openingTemporalSummary = temporal.requireCoherentSession("abrir o lote");
         if (openingTemporalSummary.degraded) {
           auditUi.showToast("Referência temporal auxiliar indisponível. A auditoria continuará localmente em contingência e sem quadro temporal na Declaração de Recebimento.", "warning");
         }
       } catch (error) {
+        if (!isCurrent()) return false;
         elements.auditSummary.textContent = "A abertura foi bloqueada pela referência temporal";
         return auditUi.showToast(auditUi.friendlyErrorMessage(error, "abrir o lote"), "error");
       }
@@ -304,9 +368,11 @@
 
       try {
         const session = await cryptoApi.openContainer(file, secret, message => {
+          if (!isCurrent()) return;
           elements.auditSummary.textContent = message;
           auditUi.setActivityProgress("audit-progress", true, message);
         });
+        if (!isCurrent()) return false;
         const manifest = session.manifest;
         await validationApi.validateManifest(manifest, session, cryptoApi);
         const signedResult = await session.decryptRecordWithHash(manifest.signedDeclaration.recordIndex);
@@ -334,6 +400,7 @@
 
         for (let index = 0; index < manifest.evidence.length; index += 1) {
           const evidence = manifest.evidence[index];
+          if (!isCurrent()) return false;
           const progressMessage = `Conferindo ${index + 1} de ${manifest.evidence.length}: ${evidence.name}`;
           elements.auditSummary.textContent = progressMessage;
           auditUi.setActivityProgress("audit-progress", true, progressMessage);
@@ -391,6 +458,7 @@
             const auditDocumentId = domain.newDocumentId("REC");
             auditPdf = pdfApi.auditDeclaration({
               documentId: auditDocumentId,
+              qualifiedLotHash: manifest.qualifiedLotHash,
               initialDocumentId: manifest.initialDocumentId,
               lotCode: manifest.lotCode,
               receiver,
@@ -408,8 +476,13 @@
             );
           }
         }
+        if (!isCurrent()) return false;
         renderAudit(manifest, results, declarationCheck, session, auditPdf, declarationBlockReason);
+        return true;
       } catch (error) {
+        if (!isCurrent()) return false;
+        clearResult();
+        if (elements.auditResults) elements.auditResults.hidden = false;
         elements.auditSummary.textContent = "A abertura não foi concluída";
         auditUi.showToast(auditUi.friendlyErrorMessage(error, "abrir e conferir o lote"), "error");
       } finally {
@@ -449,7 +522,7 @@
       }
     }
 
-    return Object.freeze({ resetAudit, openAndAudit, saveAuditDownload, analyzeAuditFile });
+    return Object.freeze({ resetAudit, selectContainer, clearReceivingSecret, openAndAudit, saveAuditDownload, analyzeAuditFile });
   }
 
   registry.register("audit", createAudit);

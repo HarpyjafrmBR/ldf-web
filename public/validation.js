@@ -27,15 +27,32 @@
     reviewDeclarationFileName,
     inspectPdf,
     validateManifest,
+    validateDraftManifest,
+    validateQualifiedLotRecord,
+    validateProductionQualifiedLotRecord,
     qualifiedLotRecordFromManifest,
-    requireSafeFileName
+    requireSafeFileName,
+    normalizePersonalName,
+    isValidPersonalName,
+    isValidCpf,
+    isCollectionDateTimeOnOrBefore
   });
 
   async function validateManifest(manifest, session, cryptoApi) {
+    return validateManifestPayloads(manifest, session.recordCount(), index => session.recordSize(index), cryptoApi);
+  }
+
+  async function validateDraftManifest(manifest, payloads, cryptoApi) {
+    if (!Array.isArray(payloads) || !payloads.length || payloads.length > 9999
+      || payloads.some(payload => !payload || !Number.isSafeInteger(payload.size) || payload.size < 0)) fail();
+    return validateManifestPayloads(manifest, payloads.length + 1, index => payloads[index - 1]?.size, cryptoApi);
+  }
+
+  async function validateManifestPayloads(manifest, recordCount, recordSize, cryptoApi) {
     validateManifestRoot(manifest);
-    const coverage = createRecordCoverage(session);
-    validateSignedDeclaration(manifest.signedDeclaration, manifest.lotCode, session, coverage.registerIndex);
-    validateEvidenceCoverage(manifest.evidence, session, coverage);
+    const coverage = createRecordCoverage(recordCount);
+    validateSignedDeclaration(manifest.signedDeclaration, manifest.lotCode, recordSize, coverage.registerIndex);
+    validateEvidenceCoverage(manifest.evidence, recordSize, coverage, manifest.declarationIssuedAt);
     return validateQualifiedLotReconstruction(manifest, cryptoApi);
   }
 
@@ -85,6 +102,33 @@
     if (typeof value !== "string" || value.length < minimum || value.length > maximum) fail();
   }
 
+  function normalizePersonalName(value) {
+    return typeof value === "string" ? value.trim().replace(/\s+/gu, " ") : "";
+  }
+
+  function isValidPersonalName(value) {
+    if (typeof value !== "string" || /[\x00-\x1f\x7f]/.test(value)) return false;
+    const normalized = normalizePersonalName(value);
+    return normalized.length >= 1 && normalized.length <= 120
+      && /^\p{L}[\p{L}\p{M}]*(?:[ '\u2019-]\p{L}[\p{L}\p{M}]*)*$/u.test(normalized);
+  }
+
+  function isValidCpf(value) {
+    if (typeof value !== "string" || !/^\d{3}\.\d{3}\.\d{3}-\d{2}$/.test(value)) return false;
+    const digits = value.replace(/\D/g, "");
+    if (/^(\d)\1{10}$/.test(digits)) return false;
+    const checkDigit = partial => {
+      let sum = 0;
+      for (let index = 0; index < partial.length; index += 1) {
+        sum += Number(partial[index]) * (partial.length + 1 - index);
+      }
+      const result = (sum * 10) % 11;
+      return result === 10 ? 0 : result;
+    };
+    const first = checkDigit(digits.slice(0, 9));
+    return digits.endsWith(`${first}${checkDigit(`${digits.slice(0, 9)}${first}`)}`);
+  }
+
   function requireBoolean(value) {
     if (typeof value !== "boolean") fail();
   }
@@ -109,7 +153,7 @@
   }
 
   function requireLotCode(value) {
-    if (typeof value !== "string" || !/^[\p{L}\p{N}_-]{3,60}$/u.test(value)) fail();
+    if (typeof value !== "string" || !/^[\p{L}\p{N}_-]{1,60}$/u.test(value)) fail();
   }
 
   function signedDeclarationFileName(lotCode) {
@@ -135,6 +179,21 @@
         || hour < 0 || hour > 23 || minute < 0 || minute > 59
         || second < 0 || second > 59) fail();
     return `${dayText}/${monthText}/${yearText} ${hourText}:${minuteText}:${secondText}`;
+  }
+
+  function isCollectionDateTimeOnOrBefore(inputDateTime, issuedAt) {
+    try {
+      requireCanonicalLocalDateTime(inputDateTime);
+      if (typeof issuedAt !== "string") return false;
+      const match = /^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2}):(\d{2})$/.exec(issuedAt);
+      if (!match) return false;
+      const [, day, month, year, hour, minute, second] = match;
+      const issuedCanonical = `${year}-${month}-${day}T${hour}:${minute}:${second}`;
+      requireCanonicalLocalDateTime(issuedCanonical);
+      return inputDateTime <= issuedCanonical;
+    } catch {
+      return false;
+    }
   }
 
   function requireBoundedJson(value, depth = 0, budget = { nodes: 0 }) {
@@ -165,11 +224,19 @@
 
   function requireOperator(operator) {
     requireExactKeys(operator, ["name", "cpf"]);
-    requireString(operator.name, 120, 3);
-    if (typeof operator.cpf !== "string" || !/^\d{3}\.\d{3}\.\d{3}-\d{2}$/.test(operator.cpf)) fail();
+    if (!isValidPersonalName(operator.name) || !isValidCpf(operator.cpf)) fail();
   }
 
-  function requireAttachment(attachment, kind, session, registerIndex) {
+  function requireQualifiedAttachment(attachment, kind) {
+    requireExactKeys(attachment, ["name", "mimeType", "size", "hash"]);
+    requireSafeFileName(attachment.name, kind === "document" ? ".pdf" : "");
+    requireMimeType(attachment.mimeType, kind === "document" ? "application/pdf" : "");
+    if (kind === "photo" && !attachment.mimeType.startsWith("image/")) fail();
+    requireSafeInteger(attachment.size);
+    requireSha256(attachment.hash);
+  }
+
+  function requireAttachment(attachment, kind, recordSize, registerIndex) {
     requireExactKeys(attachment, ["recordIndex", "name", "mimeType", "size", "hash"]);
     requireSafeInteger(attachment.recordIndex, 2);
     requireSafeFileName(attachment.name, kind === "document" ? ".pdf" : "");
@@ -177,19 +244,20 @@
     if (kind === "photo" && !attachment.mimeType.startsWith("image/")) fail();
     requireSafeInteger(attachment.size);
     requireSha256(attachment.hash);
-    if (session.recordSize(attachment.recordIndex) !== attachment.size) fail();
+    if (recordSize(attachment.recordIndex) !== attachment.size) fail();
     registerIndex(attachment.recordIndex);
   }
 
-  function requireMetadata(metadata, session, registerIndex) {
+  function requireMetadataCore(metadata, declarationIssuedAt) {
     requireExactKeys(metadata, [
       "id", "nature", "responsible", "inputDateTime", "location", "description",
       "unavailabilityReason", "unavailability", "dateTime", "photos", "documents"
     ]);
     requireString(metadata.id, 120);
     requireString(metadata.nature, 200);
-    requireString(metadata.responsible, 120, 3);
+    if (!isValidPersonalName(metadata.responsible)) fail();
     const brazilianDateTime = requireCanonicalLocalDateTime(metadata.inputDateTime);
+    if (!isCollectionDateTimeOnOrBefore(metadata.inputDateTime, declarationIssuedAt)) fail();
     requireString(metadata.location, 500);
     requireString(metadata.description, MAX_TEXT);
     requireString(metadata.unavailabilityReason, 40);
@@ -197,8 +265,53 @@
     if (metadata.dateTime !== brazilianDateTime) fail();
     if (!Array.isArray(metadata.photos) || metadata.photos.length > MAX_ATTACHMENTS_PER_EVIDENCE) fail();
     if (!Array.isArray(metadata.documents) || metadata.documents.length > MAX_ATTACHMENTS_PER_EVIDENCE) fail();
-    metadata.photos.forEach(photo => requireAttachment(photo, "photo", session, registerIndex));
-    metadata.documents.forEach(document => requireAttachment(document, "document", session, registerIndex));
+  }
+
+  function requireMetadata(metadata, recordSize, registerIndex, declarationIssuedAt) {
+    requireMetadataCore(metadata, declarationIssuedAt);
+    metadata.photos.forEach(photo => requireAttachment(photo, "photo", recordSize, registerIndex));
+    metadata.documents.forEach(document => requireAttachment(document, "document", recordSize, registerIndex));
+  }
+
+  function validateQualifiedLotRecord(record) {
+    requireExactKeys(record, [
+      "profile", "containerFormat", "documentId", "lotCode", "operator",
+      "issuedAt", "temporalSummary", "evidence"
+    ]);
+    if (record.profile !== QUALIFIED_LOT_PROFILE || record.containerFormat !== FORMAT) fail();
+    requireString(record.documentId, 80);
+    requireLotCode(record.lotCode);
+    requireOperator(record.operator);
+    requireString(record.issuedAt, 40);
+    requireBoundedJson(record.temporalSummary);
+    if (!Array.isArray(record.evidence) || !record.evidence.length || record.evidence.length > MAX_EVIDENCE) fail();
+    record.evidence.forEach(evidence => {
+      requireExactKeys(evidence, ["name", "hash", "metadata"]);
+      requireSafeFileName(evidence.name);
+      requireSha256(evidence.hash);
+      requireMetadataCore(evidence.metadata, record.issuedAt);
+      evidence.metadata.photos.forEach(photo => requireQualifiedAttachment(photo, "photo"));
+      evidence.metadata.documents.forEach(document => requireQualifiedAttachment(document, "document"));
+    });
+    return record;
+  }
+
+  function validateProductionQualifiedLotRecord(record, sourceTypeLabels, primarySourceStatusLabels) {
+    validateQualifiedLotRecord(record);
+    if (!isPlainObject(sourceTypeLabels) || !isPlainObject(primarySourceStatusLabels)) fail();
+    const sourceLines = Object.values(sourceTypeLabels).map(label => `Forma de obtenção: ${label}.`);
+    record.evidence.forEach(({ metadata }) => {
+      const statusLabel = primarySourceStatusLabels[metadata.unavailabilityReason];
+      const [sourceLine, statusLine, ...detailsLines] = metadata.unavailability.split("\n");
+      const details = detailsLines.join("\n");
+      if (!sourceLines.includes(sourceLine)
+        || typeof statusLabel !== "string"
+        || statusLine !== `Situação da fonte primária: ${statusLabel}.`
+        || (details && !details.startsWith("Informações complementares: "))
+        || (metadata.unavailabilityReason === "other"
+          && !details.slice("Informações complementares: ".length).trim())) fail();
+    });
+    return record;
   }
 
   function qualifiedLotRecordFromManifest(manifest) {
@@ -257,8 +370,7 @@
     requireBoundedJson(manifest.auditTrail);
   }
 
-  function createRecordCoverage(session) {
-    const recordCount = session.recordCount();
+  function createRecordCoverage(recordCount) {
     requireSafeInteger(recordCount, 2, 10000);
     const referenced = new Set();
     const registerIndex = recordIndex => {
@@ -269,7 +381,7 @@
     return { recordCount, referenced, registerIndex };
   }
 
-  function validateSignedDeclaration(declaration, lotCode, session, registerIndex) {
+  function validateSignedDeclaration(declaration, lotCode, recordSize, registerIndex) {
     requireExactKeys(declaration, [
       "recordIndex", "name", "mimeType", "size", "hash", "originalName",
       "documentIdTextDetected", "qualifiedLotHashTextDetected", "signatureMarkersDetected"
@@ -279,7 +391,7 @@
     requireBoolean(declaration.documentIdTextDetected);
     requireBoolean(declaration.qualifiedLotHashTextDetected);
     requireBoolean(declaration.signatureMarkersDetected);
-    if (session.recordSize(declaration.recordIndex) !== declaration.size) fail();
+    if (recordSize(declaration.recordIndex) !== declaration.size) fail();
     if (declaration.recordIndex !== 1) fail();
     requireSafeFileName(declaration.name, ".pdf");
     if (declaration.name !== signedDeclarationFileName(lotCode)) fail();
@@ -288,7 +400,7 @@
     registerIndex(1);
   }
 
-  function validateEvidenceCoverage(evidenceItems, session, coverage) {
+  function validateEvidenceCoverage(evidenceItems, recordSize, coverage, declarationIssuedAt) {
     for (const evidence of evidenceItems) {
       requireExactKeys(evidence, ["recordIndex", "name", "mimeType", "size", "hash", "metadata"]);
       requireSafeInteger(evidence.recordIndex, 2);
@@ -296,9 +408,9 @@
       requireMimeType(evidence.mimeType);
       requireSafeInteger(evidence.size);
       requireSha256(evidence.hash);
-      if (session.recordSize(evidence.recordIndex) !== evidence.size) fail();
+      if (recordSize(evidence.recordIndex) !== evidence.size) fail();
       coverage.registerIndex(evidence.recordIndex);
-      requireMetadata(evidence.metadata, session, coverage.registerIndex);
+      requireMetadata(evidence.metadata, recordSize, coverage.registerIndex, declarationIssuedAt);
     }
 
     if (coverage.referenced.size !== coverage.recordCount - 1) fail();
@@ -309,6 +421,7 @@
 
   async function validateQualifiedLotReconstruction(manifest, cryptoApi) {
     const reconstructed = qualifiedLotRecordFromManifest(manifest);
+    validateQualifiedLotRecord(reconstructed);
     requireExactKeys(manifest.qualifiedLotRecord, [
       "profile", "containerFormat", "documentId", "lotCode", "operator",
       "issuedAt", "temporalSummary", "evidence"

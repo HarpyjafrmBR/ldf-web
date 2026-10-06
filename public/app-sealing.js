@@ -15,64 +15,45 @@
     pdfApi,
     validationApi,
     selectors,
+    sourceTypeLabels,
+    primarySourceStatusLabels,
     transitions,
     domain,
     limits
   }) {
-    function getValidatedLotData() {
+    function getValidatedRegistrationData() {
       if (!store.runtimeReady) throw new Error("Aguarde a preparação do ambiente criptográfico.");
       const lotCode = elements.lotCodeInput.value.trim();
-      const operatorName = elements.operatorNameInput.value.trim();
+      const operatorName = validationApi.normalizePersonalName(elements.operatorNameInput.value);
       const operatorCpf = domain.formatCpfInput(elements.operatorCpfInput.value);
-      const secret = elements.lotSecretInput.value;
-      const confirmation = elements.lotSecretConfirmInput.value;
 
-      if (!/^[\p{L}\p{N}_-]{3,60}$/u.test(lotCode)) throw new Error("Use de 3 a 60 letras, números, hífens ou sublinhados na identificação do lote.");
-      if (operatorName.length < 3) throw new Error("Informe o nome completo do operador.");
+      sealingUi.validateFields?.([
+        [elements.lotCodeInput, /^[\p{L}\p{N}_-]{1,60}$/u.test(lotCode)],
+        [elements.operatorNameInput, validationApi.isValidPersonalName(elements.operatorNameInput.value)],
+        [elements.operatorCpfInput, domain.isValidCpf(operatorCpf)]
+      ]);
+      if (!/^[\p{L}\p{N}_-]{1,60}$/u.test(lotCode)) throw new Error("Use de 1 a 60 letras, números, hífens ou sublinhados na identificação do lote.");
+      if (!validationApi.isValidPersonalName(elements.operatorNameInput.value)) throw new Error("Informe o nome completo do operador.");
       if (!domain.isValidCpf(operatorCpf)) throw new Error("Informe um CPF válido para o operador.");
-      if (secret.length < limits.minSecretLength) throw new Error(`A chave do lote precisa ter pelo menos ${limits.minSecretLength} caracteres.`);
-      if (secret.length > limits.maxSecretLength) throw new Error(`A chave do lote pode ter no máximo ${limits.maxSecretLength} caracteres.`);
-      if (secret !== confirmation) throw new Error("A confirmação da chave não corresponde ao valor informado.");
       if (!store.evidence.length) throw new Error("Adicione ao menos um vestígio ao lote.");
       if (store.evidence.some(item => !item.metadata)) throw new Error("Conclua a qualificação de todos os vestígios.");
 
       elements.operatorCpfInput.value = operatorCpf;
-      return { lotCode, operator: { name: operatorName, cpf: operatorCpf }, secret };
+      elements.operatorNameInput.value = operatorName;
+      return { lotCode, operator: { name: operatorName, cpf: operatorCpf } };
     }
 
-    function focusSignedDeclarationPrerequisite() {
-      const secretLength = elements.lotSecretInput.value.length;
-      if (secretLength < limits.minSecretLength || secretLength > limits.maxSecretLength) {
-        elements.lotSecretInput.focus();
-        return;
-      }
-      if (elements.lotSecretInput.value !== elements.lotSecretConfirmInput.value) {
-        elements.lotSecretConfirmInput.focus();
-      }
-    }
-
-    function validateSignedDeclarationPrerequisites() {
-      try {
-        return getValidatedLotData();
-      } catch (error) {
-        elements.signedInput.value = "";
-        sealingUi.showToast(
-          sealingUi.friendlyErrorMessage(error, "selecionar a declaração assinada"),
-          "error"
-        );
-        focusSignedDeclarationPrerequisite();
-        return null;
-      }
-    }
-
-    function guardSignedDeclarationSelection(event) {
-      if (store.locked !== true || selectors.hasPendingContainer()) {
-        event?.preventDefault();
-        return false;
-      }
-      if (validateSignedDeclarationPrerequisites()) return true;
-      event?.preventDefault();
-      return false;
+    function getValidatedSealingSecret() {
+      const secret = elements.lotSecretInput.value;
+      const confirmation = elements.lotSecretConfirmInput.value;
+      sealingUi.validateFields?.([
+        [elements.lotSecretInput, secret.length >= limits.minSecretLength && secret.length <= limits.maxSecretLength],
+        [elements.lotSecretConfirmInput, Boolean(confirmation) && secret === confirmation]
+      ]);
+      if (secret.length < limits.minSecretLength) throw new Error(`A chave do lote precisa ter pelo menos ${limits.minSecretLength} caracteres.`);
+      if (secret.length > limits.maxSecretLength) throw new Error(`A chave do lote pode ter no máximo ${limits.maxSecretLength} caracteres.`);
+      if (secret !== confirmation) throw new Error("A confirmação da chave não corresponde ao valor informado.");
+      return secret;
     }
 
     function buildInitialData(lotData) {
@@ -120,20 +101,24 @@
     }
 
     async function generateInitialDeclaration() {
+      if (store.locked || selectors.hasPendingContainer() || store.containerSaved) return;
       let routineStarted = false;
+      let declarationDrafted = false;
       try {
-        const lotData = getValidatedLotData();
+        const lotData = getValidatedRegistrationData();
         routineStarted = sealingUi.beginExclusiveRoutine("geração e salvamento da declaração de registro");
         if (!routineStarted) return;
         sealingUi.setActivityProgress("operation-progress", true, "Gerando e salvando a declaração de registro...");
         await sealingTemporal.ensureCreationSession();
         sealingTemporal.requireCoherentSession("emitir a declaração de registro");
         store.documentId = domain.newDocumentId("REG");
+        declarationDrafted = true;
         store.issuedAt = domain.localDateTime();
         store.declarationTemporalSummary = sealingTemporal.requireCoherentSession("emitir a declaração de registro");
         store.qualifiedLotRecord = buildQualifiedLotRecord(lotData);
+        validationApi.validateProductionQualifiedLotRecord(store.qualifiedLotRecord, sourceTypeLabels, primarySourceStatusLabels);
         store.qualifiedLotHash = await cryptoApi.sha256Canonical(store.qualifiedLotRecord);
-        const pdf = pdfApi.initialDeclaration(buildInitialData(lotData));
+        const pdf = pdfApi.initialDeclaration({ ...store.qualifiedLotRecord, qualifiedLotHash: store.qualifiedLotHash });
         const fileName = validationApi.signedDeclarationFileName(lotData.lotCode);
         const saveResult = await sealingFileIo.saveBlob(pdf, fileName);
         if (saveResult === "cancelled") {
@@ -153,19 +138,25 @@
         elements.lotSecretConfirmInput.value = "";
         elements.lotSecretInput.type = "password";
         elements.lotSecretConfirmInput.type = "password";
-        elements.lotSecretHelp.textContent = "Por segurança, a chave foi retirada da tela. Informe-a novamente ou gere outra antes de selecionar o PDF assinado.";
-        elements.stepOne.className = "step";
-        elements.stepTwo.classList.add("current");
+        elements.lotSecretHelp.textContent = "O servidor não recebe nem recupera esta chave. Insira uma senha no mínimo com 12 caracteres.";
+
         lotController.addLog(`Declaração de registro emitida: ${fileName}`);
         lotController.addLog(`Identificador da declaração: ${store.documentId}`);
         lotController.addLog(`SHA-256 do conjunto qualificado: ${store.qualifiedLotHash}`);
         if (saveResult === "download-requested") {
           lotController.addLog(`Download da declaração de registro solicitado: ${fileName} [DOWNLOAD_REQUESTED].`, "warning");
-          sealingUi.showToast("Download da declaração de registro solicitado. Confirme a conclusão no navegador, assine o PDF e selecione-o no Passo 2.", "warning");
+          sealingUi.showToast("Download da declaração de registro solicitado. Confirme a conclusão no navegador, assine o PDF e selecione-o na etapa 3.", "warning");
         } else {
-          sealingUi.showToast("Declaração de registro gerada. Assine o PDF e selecione-o no Passo 2.");
+          sealingUi.showToast("Declaração de registro gerada. Assine o PDF e selecione-o na etapa 3.");
         }
       } catch (error) {
+        if (declarationDrafted) {
+          store.documentId = "";
+          store.issuedAt = "";
+          store.qualifiedLotHash = "";
+          store.qualifiedLotRecord = null;
+          store.declarationTemporalSummary = null;
+        }
         sealingUi.showToast(sealingUi.friendlyErrorMessage(error, "gerar ou salvar a declaração de registro"), "error");
       } finally {
         if (routineStarted) {
@@ -175,51 +166,52 @@
       }
     }
 
-    async function sealSignedDeclaration(file) {
-      if (!file || store.locked !== true) return;
-      if (selectors.hasPendingContainer()) {
-        elements.signedInput.value = "";
-        sealingUi.showToast("O lote já está preparado. Salve o contêiner ou reinicie a operação.", "warning");
-        return;
+    async function requireUnchangedQualifiedLot(lotData) {
+      const currentQualifiedLotHash = await cryptoApi.sha256Canonical(store.qualifiedLotRecord);
+      const liveQualifiedLotRecord = buildQualifiedLotRecord(lotData);
+      validationApi.validateProductionQualifiedLotRecord(liveQualifiedLotRecord, sourceTypeLabels, primarySourceStatusLabels);
+      const liveQualifiedLotHash = await cryptoApi.sha256Canonical(liveQualifiedLotRecord);
+      if (currentQualifiedLotHash !== store.qualifiedLotHash || liveQualifiedLotHash !== store.qualifiedLotHash) {
+        throw new Error("Os dados qualificados do lote mudaram depois da emissão da declaração. Reinicie a operação e gere uma nova declaração.");
       }
-      const lotData = validateSignedDeclarationPrerequisites();
-      if (!lotData) return;
-      if (!file.name.toLowerCase().endsWith(".pdf")) {
-        sealingUi.showToast("Selecione um documento PDF.", "error");
-        return;
-      }
-      let sealingSummary;
-      try {
-        sealingSummary = sealingTemporal.requireCoherentSession("prosseguir com o lacre");
-      } catch (error) {
-        elements.signedInput.value = "";
-        const message = sealingUi.friendlyErrorMessage(error, "prosseguir com o lacre");
-        lotController.addLog(`Lacre bloqueado: ${message}`, "error");
-        sealingUi.showToast(message, "error");
-        return;
-      }
-      if (!sealingUi.beginExclusiveRoutine("conferência da declaração assinada")) {
-        elements.signedInput.value = "";
-        return;
-      }
+    }
+
+    function invalidateSignedSelection() {
+      store.selectionRevision += 1;
+      store.signedSelection = null;
+    }
+
+    function isCurrentSelection(revision, documentId, qualifiedLotHash) {
+      return store.runtimeReady && store.locked && !store.containerSaved
+        && store.selectionRevision === revision && store.documentId === documentId
+        && store.qualifiedLotHash === qualifiedLotHash && !selectors.hasPendingContainer();
+    }
+
+    async function selectSignedDeclaration(file) {
+      if (!file) return false; // Cancelar o seletor conserva a escolha anterior.
+      if (!store.runtimeReady || !store.locked || selectors.hasPendingContainer() || store.containerSaved) return false;
+      invalidateSignedSelection();
+      const revision = store.selectionRevision;
+      const documentId = store.documentId;
+      const qualifiedLotHash = store.qualifiedLotHash;
+      if (!sealingUi.beginExclusiveRoutine("conferência da declaração assinada")) return false;
       sealingUi.setActivityProgress("operation-progress", true, "Conferindo a declaração assinada...");
-
       try {
-        elements.saveContainerButton.classList.add("hidden");
-
+        const lotData = getValidatedRegistrationData();
+        sealingTemporal.requireCoherentSession("prosseguir com o lacre");
         validationApi.requireSafeFileName(file.name, ".pdf");
-        if (file.size > validationApi.MAX_PDF_BYTES) {
-          throw new Error("A declaração PDF excede o limite de 64 MiB.");
-        }
+        if (file.size > validationApi.MAX_PDF_BYTES) throw new Error("A declaração PDF excede o limite de 64 MiB.");
+        const size = file.size;
         const bytes = await file.arrayBuffer();
-        const currentQualifiedLotHash = await cryptoApi.sha256Canonical(store.qualifiedLotRecord);
-        if (currentQualifiedLotHash !== store.qualifiedLotHash) {
-          throw new Error("Os dados qualificados do lote mudaram depois da emissão da declaração. Reinicie a operação e gere uma nova declaração.");
-        }
-        const pdfInspection = validationApi.inspectPdf(bytes, [store.documentId, store.qualifiedLotHash]);
+        if (bytes.byteLength !== size || file.size !== size) throw new Error("A declaração PDF mudou durante a leitura. Selecione novamente o arquivo.");
+        await requireUnchangedQualifiedLot(lotData);
+        const pdfInspection = validationApi.inspectPdf(bytes, [documentId, qualifiedLotHash]);
         const [documentIdTextDetected, qualifiedLotHashTextDetected] = pdfInspection.textMatches;
         const signedDeclarationHash = await cryptoApi.sha256Buffer(bytes);
-
+        if (!isCurrentSelection(revision, documentId, qualifiedLotHash)) return false;
+        sealingTemporal.requireCoherentSession("prosseguir com o lacre");
+        store.signedSelection = Object.freeze({ file, size, sha256: signedDeclarationHash,
+          inspection: pdfInspection, documentId, qualifiedLotHash, revision });
         if (!documentIdTextDetected) {
           lotController.addLog("O texto do identificador não foi localizado nos bytes do PDF; a conferência visual e externa permanece obrigatória.", "warning");
         } else {
@@ -238,6 +230,51 @@
           lotController.addLog("Marcadores aparentes de assinatura foram localizados; eles não validam a assinatura.");
         }
 
+        lotController.addLog("Declaração selecionada; conferências técnicas locais concluídas.");
+        return true;
+      } catch (error) {
+        if (store.selectionRevision === revision) {
+          const message = sealingUi.friendlyErrorMessage(error, "conferir a declaração assinada");
+          lotController.addLog(`Falha no fechamento: ${message}`, "error");
+          sealingUi.showToast(message, "error");
+        }
+        return false;
+      } finally {
+        elements.signedInput.value = "";
+        sealingUi.setActivityProgress("operation-progress", false);
+        sealingUi.endExclusiveRoutine();
+      }
+    }
+
+    async function prepareContainerPlan() {
+      if (!store.runtimeReady || !store.locked || selectors.hasPendingContainer() || store.containerSaved) return false;
+      if (!sealingUi.beginExclusiveRoutine("preparação do fechamento do lote")) return false;
+      sealingUi.setActivityProgress("operation-progress", true, "Preparando o fechamento do lote...");
+      try {
+        const selection = store.signedSelection;
+        if (!selection) throw new Error("Selecione e confira a declaração PDF antes de fechar o lote.");
+        const lotData = getValidatedRegistrationData();
+        const secret = getValidatedSealingSecret();
+        let sealingSummary = sealingTemporal.requireCoherentSession("prosseguir com o lacre");
+        await requireUnchangedQualifiedLot(lotData);
+        const { file, size, revision, documentId, qualifiedLotHash } = selection;
+        let bytes, signedDeclarationHash;
+        try {
+          validationApi.requireSafeFileName(file.name, ".pdf");
+          if (file.size > validationApi.MAX_PDF_BYTES) throw new Error("A declaração PDF excede o limite de 64 MiB.");
+          bytes = await file.arrayBuffer();
+          signedDeclarationHash = await cryptoApi.sha256Buffer(bytes);
+          if (file.size !== size || bytes.byteLength !== size || signedDeclarationHash !== selection.sha256) {
+            throw new Error("A declaração PDF mudou depois da conferência. Selecione novamente o arquivo.");
+          }
+        } catch (error) {
+          if (store.signedSelection === selection) invalidateSignedSelection();
+          throw error;
+        }
+        const pdfInspection = validationApi.inspectPdf(bytes, [documentId, qualifiedLotHash]);
+        const [documentIdTextDetected, qualifiedLotHashTextDetected] = pdfInspection.textMatches;
+        if (!isCurrentSelection(revision, documentId, qualifiedLotHash)) throw new Error("A seleção da declaração PDF mudou. Selecione novamente o arquivo.");
+        sealingSummary = sealingTemporal.requireCoherentSession("prosseguir com o lacre");
         const sealedAt = domain.localDateTime();
         const payloads = [file];
         const progressMessages = [`Criptografando declaração: ${file.name}`];
@@ -313,10 +350,14 @@
           evidence: evidenceManifest,
           auditTrail: store.logs.map(entry => ({ ...entry }))
         };
+        await validationApi.validateDraftManifest(internalReport, payloads, cryptoApi);
         const fileName = `LDF_${domain.safeName(lotData.lotCode)}_${domain.compactTimestamp()}.ldf`;
         const totalBytes = payloads.reduce((total, payload) => total + payload.size, 0);
+        await requireUnchangedQualifiedLot(lotData);
+        if (!isCurrentSelection(revision, documentId, qualifiedLotHash)) throw new Error("A seleção da declaração PDF mudou. Selecione novamente o arquivo.");
+        sealingTemporal.requireCoherentSession("prosseguir com o lacre");
         transitions.setPendingContainer({
-          secret: lotData.secret,
+          secret,
           internalReport,
           payloads,
           progressMessages,
@@ -333,14 +374,14 @@
         elements.saveContainerButton.textContent = "Salvar contêiner LDF";
         elements.saveContainerButton.classList.remove("hidden");
         elements.confirmContainerDownloadButton.classList.add("hidden");
-        lotController.addLog("Declaração selecionada; conferências técnicas locais concluídas.");
         sealingUi.showToast("Lote preparado. Escolha onde deseja salvar o contêiner LDF Web.");
+        return true;
       } catch (error) {
         const message = sealingUi.friendlyErrorMessage(error, "preparar o fechamento do lote");
         lotController.addLog(`Falha no fechamento: ${message}`, "error");
         sealingUi.showToast(message, "error");
+        return false;
       } finally {
-        elements.signedInput.value = "";
         sealingUi.setActivityProgress("operation-progress", false);
         sealingUi.endExclusiveRoutine();
       }
@@ -350,7 +391,7 @@
       plan.secret = "";
       transitions.setContainerSaved(true);
       transitions.setPendingContainer(null);
-      elements.stepTwo.className = "step";
+
       elements.saveContainerButton.classList.add("hidden");
       elements.saveContainerButton.textContent = "Salvar contêiner LDF";
       elements.confirmContainerDownloadButton.classList.add("hidden");
@@ -367,6 +408,7 @@
         transitions.setShippingReceipt({
           blob: pdfApi.shippingReceipt({
             documentId: domain.newDocumentId("REM"),
+            qualifiedLotHash: plan.internalReport.qualifiedLotHash,
             lotCode: plan.internalReport.lotCode,
             fileName: plan.fileName,
             containerHash: saveResult.sha256,
@@ -419,6 +461,15 @@
       try {
         plan.internalReport.sealedAt = domain.localDateTime();
         plan.internalReport.temporal.sealing = sealingSummary;
+        const liveQualifiedLotRecord = buildQualifiedLotRecord({
+          lotCode: plan.internalReport.lotCode,
+          operator: plan.internalReport.operator
+        });
+        validationApi.validateProductionQualifiedLotRecord(liveQualifiedLotRecord, sourceTypeLabels, primarySourceStatusLabels);
+        if (await cryptoApi.sha256Canonical(liveQualifiedLotRecord) !== plan.internalReport.qualifiedLotHash) {
+          throw new Error("Os dados qualificados do lote mudaram depois da emissão da declaração. Reinicie a operação e gere uma nova declaração.");
+        }
+        await validationApi.validateDraftManifest(plan.internalReport, plan.payloads, cryptoApi);
         const saveResult = await sealingFileIo.saveContainerPlan(plan, event => {
           const messages = Object.freeze({
             WRITING: "Status do Contêiner: escrita iniciada [WRITING].",
@@ -486,8 +537,6 @@
         }
         lotController.addLog(`Recibo de remessa salvo: ${store.shippingReceipt.fileName}`);
         sealingUi.showToast("Recibo de remessa salvo com sucesso.");
-        transitions.setShippingReceipt(null);
-        button.classList.add("hidden");
       } catch (error) {
         sealingUi.showToast(sealingUi.friendlyErrorMessage(error, "salvar o recibo de remessa"), "error");
       } finally {
@@ -510,8 +559,8 @@
     return Object.freeze({
       generateStrongSecret,
       generateInitialDeclaration,
-      guardSignedDeclarationSelection,
-      sealSignedDeclaration,
+      selectSignedDeclaration,
+      prepareContainerPlan,
       savePendingContainer,
       confirmFallbackContainerDownload,
       saveShippingReceipt
