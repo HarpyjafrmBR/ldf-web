@@ -184,7 +184,7 @@ function Assert-LocalMarkdownLinks {
     }
 }
 
-$forbiddenExtensions = @(".pdf", ".ldf", ".bin", ".jpg", ".jpeg", ".png", ".mp3", ".mp4", ".wav", ".pfx", ".p12", ".pem", ".key", ".env")
+$forbiddenExtensions = @(".pdf", ".ldf", ".cldf", ".bin", ".jpg", ".jpeg", ".png", ".mp3", ".mp4", ".wav", ".pfx", ".p12", ".pem", ".key", ".env")
 foreach ($name in $tree.Files) {
     if ($forbiddenExtensions -contains [IO.Path]::GetExtension($name).ToLowerInvariant()) { throw "Forbidden file type in public export: $name" }
 }

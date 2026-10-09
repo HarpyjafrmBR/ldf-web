@@ -351,7 +351,7 @@
           auditTrail: store.logs.map(entry => ({ ...entry }))
         };
         await validationApi.validateDraftManifest(internalReport, payloads, cryptoApi);
-        const fileName = `LDF_${domain.safeName(lotData.lotCode)}_${domain.compactTimestamp()}.ldf`;
+        const fileName = `LDF_${domain.safeName(lotData.lotCode)}_${domain.compactTimestamp()}.cldf`;
         const totalBytes = payloads.reduce((total, payload) => total + payload.size, 0);
         await requireUnchangedQualifiedLot(lotData);
         if (!isCurrentSelection(revision, documentId, qualifiedLotHash)) throw new Error("A seleção da declaração PDF mudou. Selecione novamente o arquivo.");

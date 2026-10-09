@@ -306,15 +306,17 @@
             <div class="evidence-meta">
               <span>${domain.formatBytes(item.file.size)}</span>
               <span class="hash" title="${item.hash}">SHA-256 ${item.hash.slice(0, 18)}…</span>
-              <span class="badge ${item.metadata ? "ok" : "pending"}">${item.metadata ? "QUALIFICADO" : "PENDENTE"}</span>
               ${item.metadata?.photos?.length ? `<span>${item.metadata.photos.length} foto(s) complementar(es)</span>` : ""}
               ${item.metadata?.documents?.length ? `<span>${item.metadata.documents.length} documento(s) complementar(es)</span>` : ""}
             </div>
           </div>
           <div class="evidence-actions">
+            <div class="qualification-action">
+              <span class="badge ${item.metadata ? "ok" : "pending"}">${item.metadata ? "QUALIFICADO" : "PENDENTE"}</span>
             <button class="icon-button" type="button" data-action="edit" data-id="${item.id}" title="Qualificar vestígio" aria-label="Qualificar ${lotUi.escapeHtml(item.file.name)}" ${store.locked ? "disabled" : ""}>
               <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>
             </button>
+            </div>
             <button class="icon-button" type="button" data-action="remove" data-id="${item.id}" title="Remover vestígio" aria-label="Remover ${lotUi.escapeHtml(item.file.name)}" ${store.locked ? "disabled" : ""}>
               <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
             </button>

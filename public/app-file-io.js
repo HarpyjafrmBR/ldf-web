@@ -81,7 +81,7 @@
             : "application/octet-stream";
           const description = extension === ".pdf"
             ? "Documento PDF"
-            : extension === ".ldf"
+            : extension === ".cldf"
               ? "Contêiner LDF Web"
               : "Arquivo de vestígio";
           const pickerOptions = { suggestedName: fileName };
@@ -128,9 +128,12 @@
             suggestedName: plan.fileName,
             types: [{
               description: "Contêiner LDF Web",
-              accept: { "application/octet-stream": [".ldf"] }
+              accept: { "application/octet-stream": [".cldf"] }
             }]
           });
+          if (typeof handle.name === "string" && !handle.name.toLowerCase().endsWith(".cldf")) {
+            throw new Error("Salve o contêiner com a extensão .cldf.");
+          }
           writable = await handle.createWritable();
           state = "WRITING";
           onState(Object.freeze({ state, logicalBytes: context.logicalBytes, writtenBytes: 0 }));

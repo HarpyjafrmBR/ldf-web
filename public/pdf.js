@@ -322,7 +322,8 @@
       { label: "Identificação do lote", value: data.lotCode },
       { label: "Arquivo remetido", value: data.fileName }
     ], 7);
-    addHashPanel(items, "SHA-256 do arquivo .LDF", data.containerHash, { tone: "evidence", after: 7 });
+    const containerExtension = /\.cldf$/i.test(data.fileName) ? ".CLDF" : ".LDF";
+    addHashPanel(items, `SHA-256 do arquivo ${containerExtension}`, data.containerHash, { tone: "evidence", after: 7 });
     addMetaPanel(items, [
       {
         label: "Confirmação da gravação",

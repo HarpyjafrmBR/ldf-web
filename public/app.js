@@ -31,7 +31,7 @@
   const RUNTIME_IDENTITY = window.LDFRuntimeIdentity;
   const operationCoordination = window.LDFOperationCoordination;
   if (!RUNTIME_IDENTITY
-    || RUNTIME_IDENTITY.releaseToken !== "beta-2.0.0"
+    || RUNTIME_IDENTITY.releaseToken !== "beta-3.0.0"
     || !/^[0-9a-f]{64}$/.test(RUNTIME_IDENTITY.buildId)
     || !(RUNTIME_IDENTITY.sourceCommit === null || /^[0-9a-f]{40}$/.test(RUNTIME_IDENTITY.sourceCommit))
     || RUNTIME_IDENTITY.cacheName !== `ldf-web-${RUNTIME_IDENTITY.releaseToken}-${RUNTIME_IDENTITY.buildId}`) {
@@ -219,6 +219,9 @@
       body: document.body,
       privacyStrip: document.querySelector(".privacy-strip"),
       toastRegion: byId("toast-region"),
+      environmentStatus: byId("secure-context-status"),
+      environmentDisclosure: byId("environment-disclosure"),
+      environmentMessages: byId("environment-messages"),
       activityIndicators: Object.freeze({
         "operation-progress": byId("operation-progress"),
         "audit-progress": byId("audit-progress")
@@ -481,14 +484,12 @@
     byId("select-container").disabled = blocked;
     byId("replace-container").disabled = blocked;
     byId("open-receipt").disabled = blocked || !auditState.selectedContainer;
-    const status = byId("secure-context-status");
     if (blocked) {
-      status.textContent = "Outra aba mantém uma operação formal";
-      status.classList.add("warning");
+      ui.setEnvironmentStatus("Outra aba mantém uma operação formal", "warning", true);
+      ui.setEnvironmentIssue("coordination", "Outra aba do LDF Web mantém uma operação formal. Encerre-a antes de iniciar esta operação.");
     } else if (preparedStatusText) {
-      status.textContent = preparedStatusText;
-      status.dataset.prepared = "true";
-      status.classList.remove("warning");
+      ui.setEnvironmentIssue("coordination");
+      ui.setEnvironmentStatus(preparedStatusText, "", true);
     }
   }
 
@@ -918,7 +919,7 @@
       for (const details of group.details) {
         details.addEventListener("toggle", () => {
           if (details.open === rendered.get(details)) return;
-          const open = details.open;
+          const open = details.open || (group.key === "environment" && !byId("environment-messages").hidden);
           present(open);
           try { sessionStorage.setItem(key, open ? "open" : "closed"); } catch { /* Sem dados operacionais. */ }
         });
@@ -936,14 +937,12 @@
   }
 
   function initializeSecurityStatus() {
-    const status = byId("secure-context-status");
     const available = window.isSecureContext && window.crypto?.subtle;
     if (available) {
-      status.textContent = "Preparando ambiente criptográfico...";
-      status.classList.remove("warning", "preparation-failed");
+      ui.setEnvironmentStatus("Preparando ambiente criptográfico...");
     } else {
-      status.textContent = "Abra por HTTPS ou localhost";
-      status.classList.add("warning");
+      ui.setEnvironmentStatus("Abra por HTTPS ou localhost", "warning");
+      ui.setEnvironmentIssue("preparation", "A criptografia exige HTTPS ou execução por localhost.");
       showToast("A criptografia exige HTTPS ou execução por localhost.", "error");
     }
     return Boolean(available);
@@ -1011,7 +1010,7 @@
       schedule: (callback, milliseconds) => window.setTimeout(callback, milliseconds),
       clearSchedule: timeoutId => window.clearTimeout(timeoutId)
     }),
-    ui: Object.freeze({ showToast })
+    ui: Object.freeze({ showToast, setEnvironmentIssue: ui.setEnvironmentIssue })
   });
 
   async function initializeApplication() {
@@ -1047,12 +1046,12 @@
     byId("select-container").disabled = false;
     byId("replace-container").disabled = false;
     byId("open-container").disabled = false;
-    const status = byId("secure-context-status");
     preparedStatusText = runtime.workerAvailable
       ? "Ambiente criptográfico preparado"
       : "Ambiente preparado com processamento local";
-    status.textContent = preparedStatusText;
-    status.dataset.prepared = "true";
+    ui.setEnvironmentIssue("preparation");
+    ui.setEnvironmentIssue("offline");
+    ui.setEnvironmentStatus(preparedStatusText, "", true);
     if (!analysisRuntime.available) {
       addLog("MediaInfo local indisponível nesta sessão; o fluxo principal permanece disponível.", "warning");
     }
@@ -1288,7 +1287,7 @@
   byId("container-input").addEventListener("change", async event => {
     const file = event.target.files[0];
     if (!file || routineState.active) return;
-    if (!file.name.toLowerCase().endsWith(".ldf")) { selectContainer(file); synchronizeCreationControls(); return; }
+    if (!file.name.toLowerCase().endsWith(".cldf")) { selectContainer(file); synchronizeCreationControls(); return; }
     if (!await acquireFormalOperation()) { event.target.value = ""; return; }
     if (selectContainer(file)) {
       byId("open-receipt").disabled = false;
@@ -1336,8 +1335,8 @@
     setRuntimeReady(false);
     setCreateControlsLocked(false);
     byId("open-container").disabled = true;
-    byId("secure-context-status").textContent = "Falha na preparação do ambiente";
-    byId("secure-context-status").classList.add("preparation-failed");
+    ui.setEnvironmentStatus("Falha na preparação do ambiente", "preparation-failed");
+    ui.setEnvironmentIssue("preparation", "O ambiente local não pôde ser preparado. Recarregue a página antes de tentar novamente.");
     environmentPreparationFailureRecord = Object.freeze({
       message: "O ambiente local não pôde ser preparado. Recarregue a página antes de tentar novamente.",
       type: "error"

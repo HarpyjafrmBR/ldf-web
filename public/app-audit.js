@@ -71,11 +71,11 @@
       elements.receiverNameInput.value = "";
       elements.receiverCpfInput.value = "";
       clearReceivingSecret();
-      if (!file.name.toLowerCase().endsWith(".ldf")) {
+      if (!file.name.toLowerCase().endsWith(".cldf")) {
         elements.containerInput.value = "";
         elements.auditSummary.textContent = "A seleção não é um contêiner LDF Web";
         if (elements.selectedContainerName) elements.selectedContainerName.textContent = "Nenhum contêiner selecionado";
-        auditUi.showToast("O arquivo selecionado não é um contêiner LDF Web.", "error");
+        auditUi.showToast("Selecione um contêiner LDF Web com extensão .cldf.", "error");
         renderOpeningSelection();
         return false;
       }
@@ -326,9 +326,9 @@
       const receiverCpf = domain.formatCpfInput(elements.receiverCpfInput.value);
       const secret = elements.auditSecretInput.value;
       if (!file) return auditUi.showToast("Selecione um contêiner LDF Web.", "error");
-      if (!file.name.toLowerCase().endsWith(".ldf")) {
+      if (!file.name.toLowerCase().endsWith(".cldf")) {
         elements.containerInput.value = "";
-        return auditUi.showToast("O arquivo selecionado não é um contêiner LDF Web.", "error");
+        return auditUi.showToast("Selecione um contêiner LDF Web com extensão .cldf.", "error");
       }
       auditUi.validateFields?.([
         [elements.receiverNameInput, validationApi.isValidPersonalName(elements.receiverNameInput.value)],

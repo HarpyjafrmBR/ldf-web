@@ -670,10 +670,12 @@ dialog::backdrop { background: rgba(0, 0, 0, .7); }
   to { opacity: 1; }
 }
 
-.toast-region { position: fixed; right: 18px; bottom: 18px; z-index: 20; display: grid; gap: 8px; width: min(390px, calc(100vw - 36px)); }
+.toast-region { position: fixed; inset: auto 18px 18px auto; z-index: 10000; display: grid; gap: 8px; width: min(390px, calc(100vw - 36px)); max-height: calc(100dvh - 36px); margin: 0; padding: 0; border: 0; background: transparent; overflow: auto; pointer-events: none; }
+.toast-region[popover]:not(:popover-open) { display: none; }
+.toast-region .toast { pointer-events: auto; }
 .toast { padding: 11px 13px; border: 1px solid #47576a; border-left: 3px solid var(--blue); border-radius: 4px; background: #18212b; color: #e6edf3; box-shadow: 0 10px 35px rgba(0, 0, 0, .35); }
-.toast.error { border-left-color: var(--red); }
-.toast.warning { border-left-color: var(--amber); }
+.toast.error { border-color: #a75050; border-left: 5px solid var(--red); background: #301b20; font-weight: 650; }
+.toast.warning { border-color: #927136; border-left: 5px solid var(--amber); background: #302718; font-weight: 650; }
 .hidden, .visually-hidden { display: none !important; }
 
 /* A apresentação pública compartilha a paleta da ferramenta e preserva a caixa lisa. */
@@ -1363,7 +1365,7 @@ html[data-theme="light"] .home-status .privacy-strip summary > span:not(.warning
 body[data-view="audit"] { background-image: radial-gradient(ellipse at 50% 12%, #3e2c24 0%, #2d1b16 43%, #201512 100%); }
 html[data-theme="light"] body[data-view="audit"] { background-image: radial-gradient(ellipse at 50% 12%, #f2e7d1 0%, #eadfc9 43%, #dac7a1 100%); }
 body[data-view="audit"] main { max-width: 1100px; }
-body[data-view="audit"] .privacy-strip:has(#secure-context-status[data-prepared="true"]:not(.warning):not(.preparation-failed)) { display: none; }
+
 .audit-steps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; list-style: none; padding: 0; margin: 22px 0 19px; }
 .audit-steps li { display: flex; gap: 9px; align-items: center; min-height: 72px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); padding: 13px; font-size: 12px; color: var(--muted); line-height: 1.5; }
 .audit-steps b { display: grid; place-items: center; width: 24px; height: 24px; flex: none; border: 1px solid var(--border); border-radius: 50%; font-size: 11px; }
@@ -1411,7 +1413,13 @@ html[data-theme="light"] #audit-results .result-status.bad { color: #b91c1c; }
 body[data-view="audit"] main { margin-inline: auto; }
 #audit-panel > .section-heading { align-items: center; gap: 16px; }
 #audit-panel > .section-heading > div { min-width: 0; }
-#audit-title { font-size: clamp(22px, 2.3vw, 28px); line-height: 1.2; }
+#create-title, #audit-title { font-size: clamp(20px, 2.3vw, 28px); line-height: 1.2; overflow-wrap: anywhere; }
+:is(#create-panel, #audit-panel) > .section-heading { align-items: center; gap: 12px; }
+:is(#create-panel, #audit-panel) > .section-heading > div { min-width: 0; }
+#reset-operation, #reset-audit { flex: 0 0 auto; min-height: 38px; }
+.qualification-action { display: inline-flex; align-items: center; gap: 8px; }
+.evidence-actions { align-items: center; flex-wrap: wrap; }
+.qualification-action .badge { white-space: nowrap; }
 #reset-audit { flex-shrink: 0; }
 .audit-steps li { font-weight: 700; font-size: 13px; }
 html[data-theme="dark"] .audit-steps .done { color: #77dfb9; }
@@ -1434,3 +1442,8 @@ body[data-view="create"] main > .privacy-strip { max-width: 1028px; margin-inlin
 #first-file .large-icon { line-height: 1; }
 #first-file .large-icon svg { width: 32px; height: 32px; }
 @media (max-width: 700px) { .next-box { align-items: stretch; flex-direction: column; } }
+
+.environment-messages { margin: 0; padding: 0 12px 10px 30px; color: var(--text); font-size: 13px; line-height: 1.5; font-weight: 650; overflow-wrap: anywhere; }
+.environment-messages li + li { margin-top: 6px; }
+html[data-theme="light"] .toast.error { border-color: #b45353; background: #fff0f0; }
+html[data-theme="light"] .toast.warning { border-color: #b58131; background: #fff5da; }

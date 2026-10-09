@@ -21,6 +21,55 @@
     let informationalReturnFocus = null;
     let visitedCreationStage = 1;
     const dialogTriggers = new Map();
+    const environmentIssues = new Map();
+    const toastParent = elements.toastRegion.parentElement;
+
+    function raiseNotifications() {
+      const region = elements.toastRegion;
+      if (!region.childElementCount) {
+        if (typeof region.hidePopover === "function" && region.matches(":popover-open")) region.hidePopover();
+        return;
+      }
+      const dialogs = Array.from(elements.body.querySelectorAll("dialog[open]"));
+      const focusedDialog = elements.body.ownerDocument.activeElement?.closest("dialog[open]");
+      const host = focusedDialog || dialogs.at(-1) || toastParent;
+      // O aviso deve pertencer ao diálogo ativo para permanecer acessível fora da área inerte.
+      if (region.parentElement !== host) host.append(region);
+      if (typeof region.showPopover === "function") {
+        if (region.matches(":popover-open")) region.hidePopover();
+        region.showPopover();
+      } else {
+        region.removeAttribute("popover");
+      }
+    }
+
+    const dialogObserver = new MutationObserver(records => {
+      if (records.some(record => record.target.matches("dialog"))) raiseNotifications();
+    });
+    dialogObserver.observe(elements.body, { attributes: true, attributeFilter: ["open"], subtree: true });
+
+    function setEnvironmentIssue(key, message = "") {
+      if (message) environmentIssues.set(key, String(message));
+      else environmentIssues.delete(key);
+      const list = elements.environmentMessages;
+      list.replaceChildren();
+      for (const text of environmentIssues.values()) {
+        const item = createElement("li");
+        item.textContent = text;
+        list.append(item);
+      }
+      list.hidden = environmentIssues.size === 0;
+      if (environmentIssues.size) elements.environmentDisclosure.open = true;
+    }
+
+    function setEnvironmentStatus(message, state = "", prepared = false) {
+      const status = elements.environmentStatus;
+      status.textContent = message;
+      status.classList.remove("warning", "preparation-failed");
+      if (state) status.classList.add(state);
+      status.dataset.prepared = String(prepared);
+      if (state) elements.environmentDisclosure.open = true;
+    }
 
     function renderCreationStages() {
       const creationStore = creationPresentation();
@@ -139,7 +188,9 @@
       toast.className = `toast ${type}`;
       toast.textContent = message;
       elements.toastRegion.append(toast);
-      schedule(() => toast.remove(), 5200);
+      toast.setAttribute("role", type === "error" || type === "warning" ? "alert" : "status");
+      raiseNotifications();
+      schedule(() => { toast.remove(); raiseNotifications(); }, 5200);
     }
 
     /*
@@ -312,6 +363,8 @@
     return Object.freeze({
       escapeHtml,
       showToast,
+      setEnvironmentIssue,
+      setEnvironmentStatus,
       friendlyErrorMessage,
       setActivityProgress,
       beginExclusiveRoutine,
