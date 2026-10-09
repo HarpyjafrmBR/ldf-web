@@ -2,8 +2,8 @@
  * MediaInfo executa em Worker e carrega somente os artefatos locais fixados na
  * publicação. Nenhum dado do vestígio é enviado para rede ou serviço externo.
  */
-importScripts("mediainfo.min.js?v=beta-2.0.0");
-importScripts("pdf-metadata.js?v=beta-2.0.0");
+importScripts("mediainfo.min.js?v=beta-3.0.0");
+importScripts("pdf-metadata.js?v=beta-3.0.0");
 
 "use strict";
 
@@ -83,7 +83,7 @@ function summarize(raw) {
   };
   return {
     status: "available",
-    engine: "MediaInfo.js 0.3.7 / MediaInfoLib 25.10",
+    engine: "MediaInfo.js 0.3.8 / MediaInfoLib 26.05",
     kind,
     origin: Object.fromEntries(Object.entries(origin).filter(([, value]) => value !== null)),
     gps: Object.fromEntries(Object.entries(gps).filter(([, value]) => value !== null)),
@@ -107,7 +107,7 @@ function prepareMediaInfo() {
       format: "object",
       full: true,
       locateFile: fileName => fileName === "MediaInfoModule.wasm"
-        ? new URL("mediainfo.wasm?v=beta-2.0.0", self.location.href).href
+        ? new URL("mediainfo.wasm?v=beta-3.0.0", self.location.href).href
         : new URL(fileName, self.location.href).href
     });
   }
@@ -177,7 +177,7 @@ async function dispatch(data) {
   if (!data || typeof data !== "object") throw new Error("Solicitação de análise inválida.");
   if (data.action === "prepare") {
     await prepareMediaInfo();
-    return { ready: true, engine: "mediainfo.js", version: "0.3.7" };
+    return { ready: true, engine: "mediainfo.js", version: "0.3.8" };
   }
   if (data.action === "analyzeFile") return analyzeFile(data.file);
   if (data.action === "analyzeRangeSource") return analyzeRangeSource(data.requestId, data.size);

@@ -10,3 +10,7 @@ Thumbs.db
 *.pem
 *.p12
 *.pfx
+
+# Contêineres operacionais
+*.ldf
+*.cldf

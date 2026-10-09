@@ -6,8 +6,8 @@
    * revisar recomendações e referências sem alterar criptografia, PDFs ou contêineres.
    */
   window.LDFGuidanceContent = Object.freeze({
-    version: "Beta 2.0.0",
-    reviewedAt: "06/08/2026",
+    version: "Beta 3.0.0",
+    reviewedAt: "08/10/2026",
     introduction: {
       title: "Antes de interagir com um possível vestígio digital",
       text: "A primeira decisão deve reduzir o risco de alteração e preservar informações sobre a origem. Faça somente o que estiver autorizado, for seguro e estiver ao alcance da sua função."
@@ -126,11 +126,11 @@
         url: "https://www.planalto.gov.br/ccivil_03/decreto-lei/del3689compilado.htm"
       },
       {
-        label: "MJSP - Procedimentos Operacionais Padrão de Perícia Criminal",
+        label: "MJSP - POPs de Perícia Criminal, Informática Forense, volume 5 (2024)",
         url: "https://www.gov.br/mj/pt-br/assuntos/sua-seguranca/seguranca-publica/analise-e-pesquisa/pop"
       },
       {
-        label: "ABC - Nota Técnica nº 01/2026 sobre vestígios cibernéticos",
+        label: "ABC, APCF e CONDPC - Nota Técnica nº 01/2026 sobre vestígios cibernéticos",
         url: "https://abcperitosoficiais.org.br/2026/05/25/nota-tecnica-01-2026-cadeia-custodia-vestigios-ciberneticos/"
       },
       {
@@ -142,7 +142,7 @@
         url: "https://www.gov.br/pt-br/servicos/registrar-ocorrencia-policial-online"
       },
       {
-        label: "NIST - diretrizes para perícia em dispositivos móveis",
+        label: "NIST SP 800-101 Rev. 1 - perícia em dispositivos móveis (2014)",
         url: "https://csrc.nist.gov/pubs/sp/800/101/r1/final"
       },
       {
@@ -150,7 +150,7 @@
         url: "https://csrc.nist.gov/glossary/term/write_blocker"
       },
       {
-        label: "SWGDE - boas práticas para coleta de evidência digital",
+        label: "SWGDE 18-F-002, versão 2.0 (20/11/2025) - coleta de evidência digital",
         url: "https://www.swgde.org/documents/published-complete-listing/18-f-002-2-0/"
       }
     ],

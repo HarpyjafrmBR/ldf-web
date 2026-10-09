@@ -178,7 +178,7 @@
       return null;
     }
     try {
-      worker = new Worker("crypto-worker.js?v=beta-2.0.0");
+      worker = new Worker("crypto-worker.js?v=beta-3.0.0");
       worker.addEventListener("message", event => {
         const pending = workerRequests.get(event.data.requestId);
         if (!pending) return;

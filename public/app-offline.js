@@ -105,7 +105,9 @@
         const instruction = String(error?.message || "").includes("Feche todas as abas")
           ? error.message
           : "O modo offline seguro não ficou pronto. Verifique a conexão e recarregue a página.";
-        offlineUi.showToast(`${instruction} Os controles continuarão bloqueados.`, "warning");
+        const message = `${instruction} Os controles continuarão bloqueados.`;
+        offlineUi.setEnvironmentIssue?.("offline", message);
+        offlineUi.showToast(message, "warning");
         return false;
       }
     }

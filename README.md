@@ -1,16 +1,10 @@
-# LDF Web v2.0.0
+# LDF Web v3.0.0
 
 **Canal de release:** Beta
 
-O LDF Web — Lacre Digital Forense é uma aplicação estática e local-first destinada
-a acondicionar, documentar e proteger vestígios digitais sem upload do conteúdo.
+O LDF Web — Lacre Digital Forense é uma aplicação estática e local-first destinada a acondicionar, documentar e proteger vestígios digitais sem upload do conteúdo.
 
-Antes de usar ou redistribuir, leia `LICENSE.md`, `SECURITY.md` e
-o [manifesto da exportação](PUBLIC_EXPORT_MANIFEST.json). A aplicação pronta para
-uso está em [`public/`](public/); seus arquivos e hashes constam em
-[`public/release-manifest.json`](public/release-manifest.json) e
-[`public/SHA256SUMS.txt`](public/SHA256SUMS.txt). A presença dos arquivos não prova
-autenticidade externa; confirme o commit e os hashes por canal independente.
+Antes de usar ou redistribuir, leia `LICENSE.md`, `SECURITY.md` e o [manifesto da exportação](PUBLIC_EXPORT_MANIFEST.json). A aplicação pronta para uso está em [`public/`](public/); seus arquivos e hashes constam em [`public/release-manifest.json`](public/release-manifest.json) e [`public/SHA256SUMS.txt`](public/SHA256SUMS.txt). A presença dos arquivos não prova autenticidade externa; confirme o commit e os hashes por canal independente.
 
 - Repositório oficial: [HarpyjafrmBR/ldf-web](https://github.com/HarpyjafrmBR/ldf-web)
 - Contato: `contato_ldfweb@lacredigitalforense.seg.br`
@@ -18,11 +12,9 @@ autenticidade externa; confirme o commit e os hashes por canal independente.
 
 ## Compatibilidade
 
-A versão 2.0.0 mantém os formatos `LDF-WEB-1` e `LDF-MANIFEST-1`, com regras de
-qualificação mais estritas. Lotes antigos com nomes, CPF ou datas incompatíveis
-com essas regras são rejeitados, sem alteração dos arquivos originais.
-Lotes novos com identificação de 1 ou 2 caracteres podem ser rejeitados por
-leitores anteriores. Use a versão atual para fechamento e abertura.
+A versão 3.0.0 gera e abre somente contêineres `.cldf` (Contêiner do Lacre Digital Forense). Os formatos `LDF-WEB-1` e `LDF-MANIFEST-1` são mantidos.
+
+Para abrir contêineres antigos `.ldf`, use a versão correspondente disponível nas [releases anteriores](https://github.com/HarpyjafrmBR/ldf-web/releases). Não há renomeação ou migração automática. A extensão não substitui as verificações de formato, integridade e qualificação.
 
 O versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 

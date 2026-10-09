@@ -2,7 +2,7 @@
 
 ## Versões acompanhadas
 
-A versão atual acompanhada é **LDF Web v2.0.0**. A presença do código em um
+Esta política acompanha **LDF Web v3.0.0**. A presença do código em um
 repositório público não demonstra, por si, que todos os gates técnicos da release
 foram executados nem que a ferramenta atende automaticamente a todo contexto de uso.
 

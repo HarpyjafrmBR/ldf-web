@@ -20,3 +20,4 @@ RELEASE_CHANNEL text eol=lf
 
 *.ps1 text eol=crlf
 *.wasm binary
+*.cldf binary
